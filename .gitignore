@@ -1,0 +1,16 @@
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.streamlit/secrets.toml
+data/*.duckdb
+data/*.duckdb.wal
+.claude/
+
+# Your own data and Garmin tokens; the synthetic sample_data/ is committed.
+private/
+
+# Larger generated datasets for experiments
+sample_data_*/

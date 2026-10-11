@@ -1,0 +1,14 @@
+{
+  "melatonin": {
+    "color": "#f97316",
+    "nap": "#fdba74"
+  },
+  "magnesium": {
+    "color": "#22c55e",
+    "nap": "#4ade80"
+  },
+  "chamomile tea": {
+    "color": "#facc15",
+    "nap": "#fde68a"
+  }
+}
