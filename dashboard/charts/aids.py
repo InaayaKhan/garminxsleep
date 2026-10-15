@@ -10,8 +10,6 @@ from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 
-from dashboard.config import DATA_ROOT
-
 from dashboard.charts.common import (
     DATE_CHART_SIDE_MARGINS,
     NAP_BAR_COLOR,
@@ -22,12 +20,17 @@ from dashboard.charts.common import (
     _pannable_date_view,
     _stacked_bar_top,
 )
+from dashboard.config import DATA_ROOT
 
 
 AID_COLORS_PATH = DATA_ROOT / "aid_colors.json"
+
+
 # No aid uses the regular night/nap colours, so unaided nights look the same
 # here as in the daily duration chart.
 NO_AID_COLORS = {"color": NIGHT_BAR_COLOR, "nap": NAP_BAR_COLOR}
+
+
 # Aids missing from aid_colors.json get a stable colour from this palette.
 FALLBACK_AID_PALETTE = [
     {"color": "#ef4444", "nap": "#f87171"},

@@ -12,21 +12,45 @@ from dashboard.config import SLEEP_TARGET_HOURS
 
 
 NIGHT_BAR_COLOR = "#5B32D6"
+
+
 NAP_BAR_COLOR = "#087CFF"
+
+
 ZERO_COLOR = "#ff3030"
+
+
 NO_DATA_COLOR = "#6B7280"
+
+
 AVERAGE_7_COLOR = "#E6B84F"
+
+
 SLEEP_SCORE_PINK = "#FF7AB6"
+
+
 STATS_GREEN = "#00ee28"
+
+
 STATS_RED = "#ff2020"
+
+
 TARGET_SLEEP_HOURS = SLEEP_TARGET_HOURS
+
+
 MAXIMUM_MARKER_COLOR = "#22c55e"
+
+
 # The daily duration and 24-hour stage charts share a day width and an hour
 # scale. Their legends sit in a fixed-width column on the right, so legend
 # wrapping never changes the plot size; the right margin holds the secondary
 # y-axes (160px) plus that legend column.
 RIGHT_LEGEND_PX = 180
+
+
 DATE_CHART_SIDE_MARGINS = dict(l=120, r=160 + RIGHT_LEGEND_PX)
+
+
 DATE_CHART_RIGHT_LEGEND = dict(fixed_height=True, legend_position="right")
 
 
@@ -142,3 +166,59 @@ WEEKDAY_ORDER = [
     "Saturday",
     "Sunday",
 ]
+
+
+def _add_spearman_annotation(
+    figure: go.Figure, x_values: pd.Series, y_values: pd.Series
+) -> None:
+    summary = _spearman_summary(x_values, y_values)
+    if summary is None:
+        return
+    correlation, count = summary
+    figure.add_annotation(
+        x=0.99,
+        y=0.99,
+        xref="paper",
+        yref="paper",
+        text=f"Spearman ρ={correlation:+.2f} · n={count}",
+        showarrow=False,
+        xanchor="right",
+        yanchor="top",
+        bgcolor="rgba(14,17,23,0.72)",
+        borderpad=4,
+        font=dict(size=11, color="#d1d5db"),
+    )
+
+
+def _add_scatter_trend(
+    figure: go.Figure,
+    x_values: pd.Series,
+    y_values: pd.Series,
+    *,
+    color: str,
+) -> None:
+    if len(x_values) < 2:
+        return
+    x_numeric = pd.Series(x_values, dtype="float64").reset_index(drop=True)
+    y_numeric = pd.Series(y_values, dtype="float64").reset_index(drop=True)
+    centered = x_numeric - x_numeric.mean()
+    denominator = float((centered**2).sum())
+    slope = (
+        float((centered * (y_numeric - y_numeric.mean())).sum() / denominator)
+        if denominator
+        else 0.0
+    )
+    intercept = float(y_numeric.mean()) - slope * float(x_numeric.mean())
+    x_start = float(x_numeric.min())
+    x_end = float(x_numeric.max())
+    figure.add_trace(
+        go.Scatter(
+            name="Trend",
+            x=[x_start, x_end],
+            y=[intercept + slope * x_start, intercept + slope * x_end],
+            mode="lines",
+            line=dict(color=color, width=2.2),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )

@@ -17,6 +17,10 @@ from dashboard.tabs import ViewData
 
 
 def render(view: ViewData) -> None:
+    st.markdown(
+        'Measurements recorded only by the Garmin watch.'
+    )
+    st.subheader("Sleep score")
     st.plotly_chart(
         sleep_score_components_figure(view.selected.garmin_metrics),
         width="stretch",
@@ -26,6 +30,7 @@ def render(view: ViewData) -> None:
         "Component colors are Garmin's Poor, Fair, Good, and Excellent qualifiers. "
         "Hover for the underlying percentage or measurement where Garmin provides it."
     )
+    st.subheader("Overnight recovery")
     st.plotly_chart(
         overnight_recovery_figure(view.selected.garmin_metrics),
         width="stretch",
@@ -35,6 +40,7 @@ def render(view: ViewData) -> None:
         "Aligned overnight recovery measures from Garmin. Missing values mean the "
         "watch or Garmin response did not provide that measurement."
     )
+    st.subheader("Daily load")
     load_column, calories_column = st.columns(2)
     with load_column:
         st.plotly_chart(
@@ -48,6 +54,7 @@ def render(view: ViewData) -> None:
             width="stretch",
             config={"displaylogo": False, "scrollZoom": False},
         )
+    st.subheader("Awakenings")
     st.plotly_chart(
         awakenings_efficiency_figure(view.selected.garmin_metrics),
         width="stretch",
@@ -58,6 +65,7 @@ def render(view: ViewData) -> None:
         "Garmin did not provide numeric restless-moment counts, so its qualitative "
         "Restlessness rating is shown instead."
     )
+    st.subheader("Through the day")
     intraday_dates = sorted(view.selected.intraday["date"].dropna().unique(), reverse=True)
     if intraday_dates:
         selected_intraday_date = st.selectbox(

@@ -1,10 +1,12 @@
-"""Timing: bed and wake times, weekday patterns and punch cards."""
+"""Timing: bed and wake times, weekday patterns, and timing vs sleep."""
 
 from __future__ import annotations
 
 import streamlit as st
 
 from dashboard.charts import (
+    asleep_time_vs_duration_figure,
+    asleep_time_vs_score_figure,
     asleep_time_weekend_highlight_figure,
     daily_duration_by_weekday_boxplot,
     hourly_sleep_punch_card,
@@ -16,6 +18,10 @@ from dashboard.tabs import ViewData
 
 
 def render(view: ViewData) -> None:
+    st.markdown(
+        'When you fall asleep and wake up, and how timing relates to how long and how well you sleep.'
+    )
+    st.subheader("Asleep and wake-up times")
     asleep_highlight_column, wake_highlight_column = st.columns(2)
     with asleep_highlight_column:
         st.plotly_chart(
@@ -35,6 +41,7 @@ def render(view: ViewData) -> None:
         "shaded regions are ± one standard deviation, and solid straight lines "
         "show overall trends."
     )
+    st.subheader("By day of week")
     st.plotly_chart(
         score_by_weekday_boxplot(view.selected.sessions),
         width="stretch",
@@ -58,6 +65,7 @@ def render(view: ViewData) -> None:
         "yellow diamonds mark weekday means. Daily duration includes naps, while "
         "nightly duration excludes naps."
     )
+    st.subheader("Hour by hour")
     night_punch_card_column, all_sleep_punch_card_column = st.columns(2)
     with night_punch_card_column:
         st.plotly_chart(
@@ -84,4 +92,22 @@ def render(view: ViewData) -> None:
     st.caption(
         "Dot size and color intensity show the number of days asleep during each "
         "hour. Purple excludes naps; blue includes night sleep and naps."
+    )
+    st.subheader("Timing vs sleep")
+    asleep_duration_column, asleep_score_column = st.columns(2)
+    with asleep_duration_column:
+        st.plotly_chart(
+            asleep_time_vs_duration_figure(view.selected.sessions),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    with asleep_score_column:
+        st.plotly_chart(
+            asleep_time_vs_score_figure(view.selected.sessions),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    st.caption(
+        "Night sleep only. Zero-sleep placeholders are excluded because they do "
+        "not have a genuine asleep time."
     )

@@ -1,4 +1,4 @@
-"""Relationships: duration, timing and efficiency vs score; multifactor and cycle."""
+"""Sleep quality: duration, efficiency and other factors vs score."""
 
 from __future__ import annotations
 
@@ -6,8 +6,6 @@ import streamlit as st
 
 from dashboard.charts import (
     TARGET_SLEEP_HOURS,
-    asleep_time_vs_duration_figure,
-    asleep_time_vs_score_figure,
     menstrual_phase_comparisons_figure,
     multifactor_relationships_figure,
     nightly_duration_quality_figure,
@@ -19,6 +17,10 @@ from dashboard.ui import format_duration
 
 
 def render(view: ViewData) -> None:
+    st.markdown(
+        'What goes with better or worse nights: duration, efficiency, several factors together, and the menstrual cycle.'
+    )
+    st.subheader("Duration and score")
     st.plotly_chart(
         nightly_duration_quality_figure(view.selected.sessions),
         width="stretch",
@@ -30,23 +32,7 @@ def render(view: ViewData) -> None:
         "dashed horizontal line marks mean historical Garmin score, and the shaded "
         "region is ± one standard deviation."
     )
-    asleep_duration_column, asleep_score_column = st.columns(2)
-    with asleep_duration_column:
-        st.plotly_chart(
-            asleep_time_vs_duration_figure(view.selected.sessions),
-            width="stretch",
-            config={"displaylogo": False},
-        )
-    with asleep_score_column:
-        st.plotly_chart(
-            asleep_time_vs_score_figure(view.selected.sessions),
-            width="stretch",
-            config={"displaylogo": False},
-        )
-    st.caption(
-        "Night sleep only. Zero-sleep placeholders are excluded because they do "
-        "not have a genuine asleep time."
-    )
+    st.subheader("Efficiency")
     efficiency_timeline_column, efficiency_score_column = st.columns(2)
     with efficiency_timeline_column:
         st.plotly_chart(
@@ -64,6 +50,7 @@ def render(view: ViewData) -> None:
         "Sleep efficiency excludes zero-duration placeholders because they have no "
         "sleep window. Garmin Sleep scores use the 0–100 scale."
     )
+    st.subheader("Several factors together")
     st.plotly_chart(
         multifactor_relationships_figure(
             view.selected.daily,
@@ -79,6 +66,7 @@ def render(view: ViewData) -> None:
         "Multifactor coefficients are standardized associations, not causal effects. "
         "Positive bars move with the outcome after accounting for the other displayed predictors."
     )
+    st.subheader("Menstrual cycle")
     st.plotly_chart(
         menstrual_phase_comparisons_figure(
             view.selected.daily,

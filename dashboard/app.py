@@ -11,15 +11,15 @@ from dashboard.data import cached_dataset, find_export, garmin_archive_signature
 from dashboard.storage import persist_dataset
 from dashboard.tabs import (
     ViewData,
+    activity,
     aids,
     frames_between,
     garmin,
     overview,
+    patterns,
     records,
-    relationships,
-    subsequent_sleep,
+    sleep_quality,
     timing,
-    trends,
 )
 from dashboard.ui import format_duration, install_chart_defaults
 
@@ -83,14 +83,14 @@ st.sidebar.metric("Recorded sessions", session_count)
 
 # Core sleep views first, then what may influence sleep, then Garmin-only
 # measurements; the raw records table comes last.
-overview_tab, distributions_tab, timing_tab, aids_tab, subsequent_sleep_tab, relationships_tab, garmin_tab, records_tab = st.tabs(
+overview_tab, patterns_tab, timing_tab, sleep_quality_tab, aids_tab, activity_tab, garmin_tab, records_tab = st.tabs(
     [
         "Overview",
-        "Trends & distributions",
+        "Patterns",
         "Timing",
+        "Sleep quality",
         "Aids",
-        "Subsequent sleep",
-        "Relationships",
+        "Activity & sleep",
         "Garmin",
         "Records",
     ]
@@ -99,20 +99,20 @@ overview_tab, distributions_tab, timing_tab, aids_tab, subsequent_sleep_tab, rel
 with overview_tab:
     overview.render(view)
 
-with distributions_tab:
-    trends.render(view)
+with patterns_tab:
+    patterns.render(view)
 
 with timing_tab:
     timing.render(view)
 
+with sleep_quality_tab:
+    sleep_quality.render(view)
+
 with aids_tab:
     aids.render(view)
 
-with subsequent_sleep_tab:
-    subsequent_sleep.render(view)
-
-with relationships_tab:
-    relationships.render(view)
+with activity_tab:
+    activity.render(view)
 
 with garmin_tab:
     garmin.render(view)

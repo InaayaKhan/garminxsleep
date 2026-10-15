@@ -7,23 +7,23 @@ from dashboard.charts.common import (
     TARGET_SLEEP_HOURS,
 )
 from dashboard.charts.overview import (
+    credit_debit_figure,
     daily_duration_figure,
     hour_px,
     sleep_composition_figure,
     sleep_stage_schedule_figure,
 )
-from dashboard.charts.trends import (
-    calendar_activity_heatmap,
-    calendar_intensity_minutes_heatmap,
+from dashboard.charts.patterns import (
     calendar_sleep_heatmap,
     calendar_sleep_score_heatmap,
-    credit_debit_figure,
     daily_duration_histogram,
     nightly_duration_histogram,
     sleep_nap_pie_figure,
     sleep_state_pie_figure,
 )
 from dashboard.charts.timing import (
+    asleep_time_vs_duration_figure,
+    asleep_time_vs_score_figure,
     asleep_time_weekend_highlight_figure,
     daily_duration_by_weekday_boxplot,
     hourly_sleep_punch_card,
@@ -37,17 +37,17 @@ from dashboard.charts.aids import (
     aid_score_figure,
     aid_sleep_stage_composition_figure,
 )
-from dashboard.charts.subsequent_sleep import (
+from dashboard.charts.activity import (
     activity_effect_on_sleep_figure,
     activity_intensity_effect_figure,
     activity_to_sleep_gap_figure,
     activity_type_comparison_figure,
+    calendar_activity_heatmap,
+    calendar_intensity_minutes_heatmap,
     intensity_minutes_vs_subsequent_sleep_figure,
     steps_floors_vs_subsequent_sleep_figure,
 )
-from dashboard.charts.relationships import (
-    asleep_time_vs_duration_figure,
-    asleep_time_vs_score_figure,
+from dashboard.charts.sleep_quality import (
     menstrual_phase_comparisons_figure,
     multifactor_relationships_figure,
     nightly_duration_quality_figure,

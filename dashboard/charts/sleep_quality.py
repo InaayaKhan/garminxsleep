@@ -1,4 +1,4 @@
-"""Charts on the Relationships tab."""
+"""Charts on the Sleep quality tab: duration, efficiency and other factors vs score."""
 
 from __future__ import annotations
 
@@ -15,36 +15,9 @@ from dashboard.charts.common import (
     SLEEP_SCORE_PINK,
     STATS_RED,
     TARGET_SLEEP_HOURS,
-    _clock_hour,
-    _spearman_summary,
+    _add_scatter_trend,
+    _add_spearman_annotation,
 )
-
-
-def _add_spearman_annotation(
-    figure: go.Figure, x_values: pd.Series, y_values: pd.Series
-) -> None:
-    summary = _spearman_summary(x_values, y_values)
-    if summary is None:
-        return
-    correlation, count = summary
-    figure.add_annotation(
-        x=0.99,
-        y=0.99,
-        xref="paper",
-        yref="paper",
-        text=f"Spearman ρ={correlation:+.2f} · n={count}",
-        showarrow=False,
-        xanchor="right",
-        yanchor="top",
-        bgcolor="rgba(14,17,23,0.72)",
-        borderpad=4,
-        font=dict(size=11, color="#d1d5db"),
-    )
-
-
-def _format_clock_hour(hours: float) -> str:
-    total_minutes = int(round(float(hours) * 60)) % (24 * 60)
-    return f"{total_minutes // 60:02d}:{total_minutes % 60:02d}"
 
 
 def menstrual_phase_comparisons_figure(
@@ -421,85 +394,6 @@ def nightly_duration_quality_figure(
     return figure
 
 
-def asleep_time_vs_duration_figure(sessions: pd.DataFrame) -> go.Figure:
-    frame = sessions[
-        (sessions["session_type"] == "NIGHT_SLEEP")
-        & (sessions["sleep_minutes"] > 0)
-    ].copy()
-    frame["asleep_hour"] = frame["sleep_start"].map(
-        lambda value: _clock_hour(value, 12)
-    )
-    frame["sleep_hours"] = frame["sleep_minutes"] / 60
-    frame = frame.sort_values("asleep_hour")
-
-    figure = go.Figure()
-    figure.add_trace(
-        go.Scatter(
-            name="Night sleep",
-            x=frame["asleep_hour"],
-            y=frame["sleep_hours"],
-            mode="markers",
-            marker=dict(color=NIGHT_BAR_COLOR, size=7, opacity=0.75),
-            customdata=frame[["sleep_date", "aid_name", "sleep_start"]],
-            hovertemplate=(
-                "%{customdata[0]}<br>Asleep: %{customdata[2]|%H:%M}<br>"
-                "Duration: %{y:.2f} h<br>Aid: %{customdata[1]}<extra></extra>"
-            ),
-        )
-    )
-    if len(frame) >= 2:
-        centered = frame["asleep_hour"] - frame["asleep_hour"].mean()
-        denominator = float((centered**2).sum())
-        slope = (
-            float(
-                (
-                    centered
-                    * (frame["sleep_hours"] - frame["sleep_hours"].mean())
-                ).sum()
-                / denominator
-            )
-            if denominator
-            else 0.0
-        )
-        intercept = float(frame["sleep_hours"].mean()) - slope * float(
-            frame["asleep_hour"].mean()
-        )
-        x_start = float(frame["asleep_hour"].min())
-        x_end = float(frame["asleep_hour"].max())
-        figure.add_trace(
-            go.Scatter(
-                name="Trend",
-                x=[x_start, x_end],
-                y=[intercept + slope * x_start, intercept + slope * x_end],
-                mode="lines",
-                line=dict(color=NIGHT_BAR_COLOR, width=2.2),
-                hoverinfo="skip",
-            )
-        )
-    y_max = max(12.0, math.ceil(float(frame["sleep_hours"].max()))) if not frame.empty else 12.0
-    figure.update_layout(
-        title="Asleep time vs nightly sleep duration",
-        height=540,
-        margin=dict(l=70, r=24, t=64, b=64),
-        showlegend=False,
-        xaxis=dict(
-            title="Asleep time",
-            range=[12, 36],
-            tickmode="array",
-            tickvals=[13, 17, 21, 25, 29, 33],
-            ticktext=["13:00", "17:00", "21:00", "01:00", "05:00", "09:00"],
-            zeroline=False,
-        ),
-        yaxis=dict(
-            title="Nightly sleep duration (hours)",
-            range=[0, y_max],
-            zeroline=False,
-        ),
-    )
-    _add_spearman_annotation(figure, frame["asleep_hour"], frame["sleep_hours"])
-    return figure
-
-
 def sleep_efficiency_figure(sessions: pd.DataFrame) -> go.Figure:
     frame = sessions[
         (sessions["session_type"] == "NIGHT_SLEEP")
@@ -543,89 +437,6 @@ def sleep_efficiency_figure(sessions: pd.DataFrame) -> go.Figure:
         xaxis=dict(title="Sleep date", tickformat="%d/%m"),
         yaxis=dict(title="Sleep efficiency", range=[0, 100], ticksuffix="%"),
     )
-    return figure
-
-
-def _add_scatter_trend(
-    figure: go.Figure,
-    x_values: pd.Series,
-    y_values: pd.Series,
-    *,
-    color: str,
-) -> None:
-    if len(x_values) < 2:
-        return
-    x_numeric = pd.Series(x_values, dtype="float64").reset_index(drop=True)
-    y_numeric = pd.Series(y_values, dtype="float64").reset_index(drop=True)
-    centered = x_numeric - x_numeric.mean()
-    denominator = float((centered**2).sum())
-    slope = (
-        float((centered * (y_numeric - y_numeric.mean())).sum() / denominator)
-        if denominator
-        else 0.0
-    )
-    intercept = float(y_numeric.mean()) - slope * float(x_numeric.mean())
-    x_start = float(x_numeric.min())
-    x_end = float(x_numeric.max())
-    figure.add_trace(
-        go.Scatter(
-            name="Trend",
-            x=[x_start, x_end],
-            y=[intercept + slope * x_start, intercept + slope * x_end],
-            mode="lines",
-            line=dict(color=color, width=2.2),
-            hoverinfo="skip",
-            showlegend=False,
-        )
-    )
-
-
-def asleep_time_vs_score_figure(sessions: pd.DataFrame) -> go.Figure:
-    frame = sessions[
-        (sessions["session_type"] == "NIGHT_SLEEP")
-        & (sessions["sleep_minutes"] > 0)
-        & sessions["legacy_garmin_score_10"].notna()
-    ].copy()
-    frame["asleep_hour"] = frame["sleep_start"].map(
-        lambda value: _clock_hour(value, 12)
-    )
-    frame["asleep_text"] = frame["asleep_hour"].map(_format_clock_hour)
-    frame["score_100"] = frame["legacy_garmin_score_10"] * 10
-    figure = go.Figure(
-        go.Scatter(
-            x=frame["asleep_hour"],
-            y=frame["score_100"],
-            mode="markers",
-            marker=dict(color=SLEEP_SCORE_PINK, size=7, opacity=0.75),
-            customdata=frame[["sleep_date", "aid_name", "asleep_text"]],
-            hovertemplate=(
-                "%{customdata[0]}<br>Asleep: %{customdata[2]}<br>"
-                "Garmin Sleep score: %{y:.0f}/100<br>"
-                "Aid: %{customdata[1]}<extra></extra>"
-            ),
-            showlegend=False,
-        )
-    )
-    _add_scatter_trend(
-        figure,
-        frame["asleep_hour"],
-        frame["score_100"],
-        color=SLEEP_SCORE_PINK,
-    )
-    figure.update_layout(
-        title="Asleep time vs Garmin Sleep score",
-        height=520,
-        margin=dict(l=70, r=24, t=64, b=64),
-        xaxis=dict(
-            title="Asleep time",
-            range=[12, 36],
-            tickmode="array",
-            tickvals=[13, 17, 21, 25, 29, 33],
-            ticktext=["13:00", "17:00", "21:00", "01:00", "05:00", "09:00"],
-        ),
-        yaxis=dict(title="Garmin Sleep score (0–100)", range=[0, 100], dtick=10),
-    )
-    _add_spearman_annotation(figure, frame["asleep_hour"], frame["score_100"])
     return figure
 
 

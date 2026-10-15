@@ -1,4 +1,4 @@
-"""Charts relating an activity or day to the sleep that follows."""
+"""Charts on the Activity & sleep tab: activity calendars and the following night."""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from dashboard.config import DAYTIME_WINDOW_MINUTES, DAYTIME_WINDOW_TEXT, TIMEZONE_NAME
-
 from dashboard.charts.common import (
+    WEEKDAY_ORDER,
     _spearman_summary,
 )
+from dashboard.config import DAYTIME_WINDOW_MINUTES, DAYTIME_WINDOW_TEXT, TIMEZONE_NAME
 
 
 def activity_effect_on_sleep_figure(
@@ -749,5 +749,191 @@ def steps_floors_vs_subsequent_sleep_figure(
         title="Steps and floors climbed vs subsequent sleep",
         height=720,
         margin=dict(l=76, r=34, t=95, b=70),
+    )
+    return figure
+
+
+def calendar_activity_heatmap(
+    daily: pd.DataFrame, activities: pd.DataFrame
+) -> go.Figure:
+    calendar = daily[["date"]].copy()
+    calendar["timestamp"] = pd.to_datetime(calendar["date"])
+    calendar["week_start"] = calendar["timestamp"] - pd.to_timedelta(
+        calendar["timestamp"].dt.dayofweek, unit="D"
+    )
+    calendar["weekday_number"] = calendar["timestamp"].dt.dayofweek
+    weeks = sorted(calendar["week_start"].drop_duplicates())
+    week_lookup = {week: index for index, week in enumerate(weeks)}
+
+    if activities.empty:
+        activity_days = pd.DataFrame()
+    else:
+        activity_days = (
+            activities.groupby("activity_date", as_index=False)
+            .agg(
+                activity_type=(
+                    "activity_type",
+                    lambda values: (
+                        str(values.iloc[0])
+                        if values.nunique() == 1
+                        else "multiple_activities"
+                    ),
+                ),
+                activity_names=(
+                    "activity_name",
+                    lambda values: ", ".join(dict.fromkeys(map(str, values))),
+                ),
+                activity_minutes=(
+                    "duration_seconds", lambda values: values.sum() / 60
+                ),
+            )
+            .rename(columns={"activity_date": "date"})
+        )
+        activity_days = activity_days.merge(
+            calendar[["date", "timestamp", "week_start", "weekday_number"]],
+            on="date",
+            how="inner",
+        )
+        activity_days["week_number"] = activity_days["week_start"].map(week_lookup)
+        activity_days["weekday"] = activity_days["weekday_number"].map(
+            dict(enumerate(WEEKDAY_ORDER))
+        )
+        activity_days["date_text"] = activity_days["timestamp"].dt.strftime("%Y-%m-%d")
+
+    figure = go.Figure()
+    if not activity_days.empty:
+        figure.add_trace(
+            go.Scatter(
+                x=activity_days["week_number"],
+                y=activity_days["weekday"],
+                mode="markers",
+                marker=dict(
+                    symbol="square",
+                    size=16,
+                    color=activity_days["activity_minutes"],
+                    cmin=0,
+                    cmax=float(activity_days["activity_minutes"].max()),
+                    colorscale=[
+                        [0.0, "#17251F"],
+                        [0.5, "#257A59"],
+                        [1.0, "#2FD6A3"],
+                    ],
+                    line=dict(color="rgba(255,255,255,0.25)", width=1.5),
+                    colorbar=dict(title="Minutes", thickness=12),
+                ),
+                customdata=activity_days[
+                    ["date_text", "activity_names", "activity_minutes"]
+                ],
+                hovertemplate=(
+                    "%{customdata[0]}<br>%{customdata[1]}<br>"
+                    "%{customdata[2]:.0f} minutes<extra></extra>"
+                ),
+                showlegend=False,
+            )
+        )
+    tick_positions = list(range(0, len(weeks), max(1, len(weeks) // 10 or 1)))
+    figure.update_layout(
+        title="Recorded activity calendar",
+        height=330,
+        margin=dict(l=80, r=65, t=64, b=56),
+        xaxis=dict(
+            title="Week starting",
+            tickmode="array",
+            tickvals=tick_positions,
+            ticktext=[pd.Timestamp(weeks[index]).strftime("%d/%m") for index in tick_positions],
+            showgrid=False,
+            zeroline=False,
+        ),
+        yaxis=dict(
+            title="Day of week",
+            categoryorder="array",
+            categoryarray=WEEKDAY_ORDER,
+            autorange="reversed",
+            showgrid=False,
+        ),
+    )
+    return figure
+
+
+def calendar_intensity_minutes_heatmap(
+    daily: pd.DataFrame, metrics: pd.DataFrame
+) -> go.Figure:
+    frame = daily[["date"]].copy()
+    intensity = (
+        metrics.set_index("date")["daily_intensity_minutes"]
+        if not metrics.empty and "daily_intensity_minutes" in metrics
+        else pd.Series(dtype=float)
+    )
+    frame["intensity_minutes"] = frame["date"].map(intensity)
+    frame = frame[frame["intensity_minutes"].notna()].copy()
+    frame["timestamp"] = pd.to_datetime(frame["date"])
+    frame["week_start"] = frame["timestamp"] - pd.to_timedelta(
+        frame["timestamp"].dt.dayofweek, unit="D"
+    )
+    frame["weekday_number"] = frame["timestamp"].dt.dayofweek
+
+    calendar_dates = daily[["date"]].copy()
+    calendar_dates["timestamp"] = pd.to_datetime(calendar_dates["date"])
+    calendar_dates["week_start"] = calendar_dates["timestamp"] - pd.to_timedelta(
+        calendar_dates["timestamp"].dt.dayofweek, unit="D"
+    )
+    weeks = sorted(calendar_dates["week_start"].drop_duplicates())
+    week_lookup = {week: index for index, week in enumerate(weeks)}
+    frame["week_number"] = frame["week_start"].map(week_lookup)
+    frame["weekday"] = frame["weekday_number"].map(dict(enumerate(WEEKDAY_ORDER)))
+    frame["date_text"] = frame["timestamp"].dt.strftime("%Y-%m-%d")
+
+    figure = go.Figure()
+    if not frame.empty:
+        figure.add_trace(
+            go.Scatter(
+                x=frame["week_number"],
+                y=frame["weekday"],
+                mode="markers",
+                marker=dict(
+                    symbol="square",
+                    size=16,
+                    color=frame["intensity_minutes"],
+                    cmin=0,
+                    cmax=max(1.0, float(frame["intensity_minutes"].max())),
+                    colorscale=[
+                        [0.0, "#17251F"],
+                        [0.5, "#257A59"],
+                        [1.0, "#2FD6A3"],
+                    ],
+                    line=dict(color="rgba(255,255,255,0.25)", width=1.5),
+                    colorbar=dict(title="Minutes", thickness=12),
+                ),
+                customdata=frame[["date_text", "intensity_minutes"]],
+                hovertemplate=(
+                    "%{customdata[0]}<br>Intensity minutes: "
+                    "%{customdata[1]:.0f}<extra></extra>"
+                ),
+                showlegend=False,
+            )
+        )
+    tick_positions = list(range(0, len(weeks), max(1, len(weeks) // 10 or 1)))
+    figure.update_layout(
+        title="Intensity minutes calendar",
+        height=330,
+        margin=dict(l=80, r=65, t=64, b=56),
+        xaxis=dict(
+            title="Week starting",
+            tickmode="array",
+            tickvals=tick_positions,
+            ticktext=[
+                pd.Timestamp(weeks[index]).strftime("%d/%m")
+                for index in tick_positions
+            ],
+            showgrid=False,
+            zeroline=False,
+        ),
+        yaxis=dict(
+            title="Day of week",
+            categoryorder="array",
+            categoryarray=WEEKDAY_ORDER,
+            autorange="reversed",
+            showgrid=False,
+        ),
     )
     return figure

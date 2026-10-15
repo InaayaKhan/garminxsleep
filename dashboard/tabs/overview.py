@@ -1,20 +1,25 @@
-"""Overview: pannable daily duration, 24-hour stages and composition."""
+"""Overview: daily duration, stages, composition and sleep balance."""
 
 from __future__ import annotations
 
 import streamlit as st
 
 from dashboard.charts import (
+    TARGET_SLEEP_HOURS,
+    credit_debit_figure,
     daily_duration_figure,
     hour_px,
     sleep_composition_figure,
     sleep_stage_schedule_figure,
 )
 from dashboard.tabs import ViewData
-from dashboard.ui import link_pannable_charts
+from dashboard.ui import format_duration, link_pannable_charts
 
 
 def render(view: ViewData) -> None:
+    st.markdown(
+        'How much and how well you slept each day. Drag the first three charts sideways to pan back in time; they move together.'
+    )
     show_duration_stages = st.toggle(
         "Show sleep stages in duration chart", value=True
     )
@@ -92,4 +97,24 @@ def render(view: ViewData) -> None:
     st.caption(
         "Each recorded Garmin night is normalized to 100%, showing the relative "
         "share of Deep, REM, Light, and Awake time."
+    )
+    st.subheader("Sleep balance")
+    credit_target_minutes = st.select_slider(
+        "Daily sleep target",
+        options=range(5 * 60, 10 * 60 + 1, 15),
+        value=int(TARGET_SLEEP_HOURS * 60),
+        format_func=format_duration,
+        key="credit_debit_target_minutes",
+    )
+    st.plotly_chart(
+        credit_debit_figure(view.selected.daily, credit_target_minutes / 60),
+        width="stretch",
+        config={"displaylogo": False},
+    )
+    st.caption(
+        f"Sleepmeter-style credit/debit uses a {format_duration(credit_target_minutes)} "
+        "daily target and a 24-hour "
+        "balance scale: meeting the target is neutral and zero sleep contributes "
+        "−24:00. The shaded region is the mean cumulative balance ± one standard "
+        "deviation; the solid diagonal line is the overall trend."
     )

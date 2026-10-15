@@ -15,6 +15,9 @@ from dashboard.tabs import ViewData
 
 
 def render(view: ViewData) -> None:
+    st.markdown(
+        'How nights with each sleep aid compare. These are descriptive: aids were used in different periods, so differences can also reflect the season or other changes.'
+    )
     garmin_aid_sessions = view.selected.sessions[
         (view.selected.sessions["source"] == "garmin")
         & (view.selected.sessions["session_type"] == "NIGHT_SLEEP")
@@ -79,6 +82,7 @@ def render(view: ViewData) -> None:
                 "change is saved. Clear aid applies None from this date forward. "
                 "Nothing is written back to Garmin Connect."
             )
+    st.subheader("Comparison by aid")
     aid_score_column, aid_duration_column = st.columns(2)
     with aid_score_column:
         st.plotly_chart(
@@ -111,6 +115,7 @@ def render(view: ViewData) -> None:
             width="stretch",
             config={"displaylogo": False},
         )
+    st.subheader("Over time")
     st.plotly_chart(
         aid_duration_timeline_figure(
             view.history.daily,

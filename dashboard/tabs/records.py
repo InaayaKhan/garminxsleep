@@ -8,6 +8,9 @@ from dashboard.tabs import ViewData
 
 
 def render(view: ViewData) -> None:
+    st.markdown(
+        'Every sleep session in the selected date range.'
+    )
     display = view.selected.sessions[
         [
             "sleep_date",

@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 
 def format_duration(minutes: float) -> str:
@@ -90,11 +89,15 @@ def install_chart_defaults() -> None:
     _toolbar_only_plotly_chart._original = _streamlit_plotly_chart
     st.plotly_chart = _toolbar_only_plotly_chart
 
-# Plotly charts render in the main page, so a script in a same-origin
-# component can reach them: panning one pannable chart pans the others too.
+# Plotly charts render in the main page, and st.iframe embeds HTML strings with
+# same-origin access, so this script can reach them: panning one pannable chart
+# pans the others too.
 _LINK_PANNING_SCRIPT = """
 <script>
 const page = window.parent;
+// This frame only hosts the script: hide it so it leaves no gap in the page.
+const host = window.frameElement && window.frameElement.closest('[data-testid="stElementContainer"]');
+if (host) host.style.display = "none";
 function linkPannableCharts() {
   const charts = [...page.document.querySelectorAll(".js-plotly-plot")]
     .filter((chart) => chart.layout && chart.layout.meta && chart.layout.meta.pan);
@@ -123,4 +126,5 @@ new MutationObserver(linkPannableCharts).observe(page.document.body, {childList:
 
 
 def link_pannable_charts() -> None:
-    components.html(_LINK_PANNING_SCRIPT, height=0)
+    # st.iframe needs a positive height; the script then hides its own frame.
+    st.iframe(_LINK_PANNING_SCRIPT, height=1, alt="Links panning across date charts")

@@ -1,7 +1,8 @@
-"""Charts on the Overview tab: daily duration, 24-hour stages, composition."""
+"""Charts on the Overview tab: daily duration, 24-hour stages, composition, credit/debit."""
 
 from __future__ import annotations
 
+import math
 from datetime import date, datetime, time, timedelta
 
 import pandas as pd
@@ -14,23 +15,37 @@ from dashboard.charts.common import (
     NAP_BAR_COLOR,
     NIGHT_BAR_COLOR,
     SLEEP_SCORE_PINK,
+    STATS_RED,
+    TARGET_SLEEP_HOURS,
     ZERO_COLOR,
     _add_no_data_markers,
+    _date_axis_limits,
+    _linear_trend,
     _pannable_date_view,
     _stacked_bar_top,
 )
 
 
 AVERAGE_28_COLOR = "#4DB88A"
+
+
 HRV_GREEN = "#4DB88A"
+
+
 HRV_WEEKLY_GREEN = "#8ED8B8"
+
+
 CLOCK_BOUNDARY_MINUTE = 0
+
+
 MENSTRUAL_PHASE_COLORS = {
     1: "#E14E5C",
     2: "#2FD6A3",
     3: "#FFB547",
     4: "#F29BDA",
 }
+
+
 MENSTRUAL_STRIP_PX = 7
 
 
@@ -1087,4 +1102,138 @@ def daily_duration_figure(
         _pannable_date_view(
             figure, frame["date"].min(), frame["date"].max(), view_start, view_end
         )
+    return figure
+
+
+def _nice_tick_step(span: float, target_ticks: int = 5) -> float:
+    rough_step = max(span / target_ticks, 1.0)
+    magnitude = 10 ** math.floor(math.log10(rough_step))
+    normalized = rough_step / magnitude
+    for candidate in (1, 2, 5, 10):
+        if normalized <= candidate:
+            return candidate * magnitude
+    return 10 * magnitude
+
+
+CREDIT_COLOR = "#E6B84F"
+
+
+def _format_signed_duration(hours: float) -> str:
+    total_minutes = int(round(abs(float(hours)) * 60))
+    sign = "-" if hours < 0 else "+" if hours > 0 else ""
+    return f"{sign}{total_minutes // 60}:{total_minutes % 60:02d}"
+
+
+def credit_debit_figure(
+    daily: pd.DataFrame, target_sleep_hours: float = TARGET_SLEEP_HOURS
+) -> go.Figure:
+    """Reproduce Sleepmeter's cumulative credit/debit view.
+
+    A target-duration day is neutral. Daily balance is scaled to a 24-hour
+    credit/debit clock, so a zero-sleep day contributes -24:00.
+    """
+    frame = daily.sort_values("date").copy()
+    frame["sleep_hours"] = frame["total_sleep_minutes"] / 60
+    frame = frame[frame["sleep_hours"].notna()].copy()
+    if frame.empty:
+        figure = go.Figure()
+        figure.add_annotation(
+            text="No completed sleep data in the selected date range",
+            showarrow=False,
+        )
+        figure.update_layout(title="Sleep credit/debit", height=540)
+        return figure
+    frame["daily_balance"] = (
+        frame["sleep_hours"] / target_sleep_hours - 1
+    ) * 24
+    frame["cumulative_balance"] = frame["daily_balance"].cumsum()
+    frame["trend"] = _linear_trend(frame["cumulative_balance"])
+    x_start, x_end = _date_axis_limits(frame["date"])
+
+    mean_balance = float(frame["cumulative_balance"].mean())
+    balance_std_value = frame["cumulative_balance"].std(ddof=1)
+    balance_std = float(balance_std_value) if pd.notna(balance_std_value) else 0.0
+    band_low = mean_balance - balance_std
+    band_high = mean_balance + balance_std
+
+    figure = go.Figure()
+    figure.add_hrect(
+        y0=band_low,
+        y1=band_high,
+        fillcolor=CREDIT_COLOR,
+        opacity=0.14,
+        line_width=0,
+        layer="below",
+    )
+    figure.add_hline(y=0, line=dict(color=STATS_RED, width=2))
+    figure.add_hline(
+        y=mean_balance,
+        line=dict(color=CREDIT_COLOR, width=1.5, dash="dash"),
+    )
+    figure.add_trace(
+        go.Scatter(
+            name="Credit/debit",
+            x=frame["date"],
+            y=frame["cumulative_balance"],
+            mode="lines",
+            line=dict(color=CREDIT_COLOR, width=1.8),
+            customdata=frame[["sleep_hours", "daily_balance"]],
+            hovertemplate=(
+                "%{x|%Y-%m-%d}<br>Sleep: %{customdata[0]:.2f} h<br>"
+                "Daily change: %{customdata[1]:+.2f} h<br>"
+                "Cumulative: %{y:+.2f} h<extra></extra>"
+            ),
+        )
+    )
+    figure.add_trace(
+        go.Scatter(
+            name="Trend",
+            x=frame["date"],
+            y=frame["trend"],
+            mode="lines",
+            line=dict(color=CREDIT_COLOR, width=2.2),
+            hoverinfo="skip",
+        )
+    )
+
+    y_low = min(float(frame["cumulative_balance"].min()), band_low, 0.0)
+    y_high = max(float(frame["cumulative_balance"].max()), band_high, 0.0)
+    padding = max((y_high - y_low) * 0.04, 4.0)
+    y_low -= padding
+    y_high += padding
+    tick_step = _nice_tick_step(y_high - y_low)
+    tick_start = math.ceil(y_low / tick_step) * tick_step
+    tick_values: list[float] = []
+    value = tick_start
+    while value <= y_high + tick_step * 0.01:
+        tick_values.append(value)
+        value += tick_step
+
+    figure.update_layout(
+        title="Sleep credit/debit",
+        showlegend=False,
+        height=540,
+        margin=dict(l=90, r=24, t=64, b=64),
+        hovermode="x",
+        xaxis=dict(
+            title="Date",
+            type="date",
+            range=[x_start, x_end],
+            minallowed=x_start,
+            maxallowed=x_end,
+            tickformat="%d/%m",
+            gridcolor="#303030",
+        ),
+        yaxis=dict(
+            title="Credit/debit (+/− HH:MM)",
+            range=[y_low, y_high],
+            minallowed=y_low,
+            maxallowed=y_high,
+            tickmode="array",
+            tickvals=tick_values,
+            ticktext=[_format_signed_duration(item) for item in tick_values],
+            gridcolor="#303030",
+            zeroline=False,
+        ),
+    )
     return figure
