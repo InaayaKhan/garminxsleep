@@ -42,7 +42,7 @@ analysis.
 ## Using your own data
 
 Point `GARMINXSLEEP_DATA_DIR` at a folder with the same layout as
-`sample_data/`. The Git-ignored `private/` folder is the intended place:
+`sample_data/`.
 
 ```text
 private/
