@@ -6,11 +6,16 @@ __pycache__/
 *.egg-info/
 .streamlit/secrets.toml
 data/*.duckdb
+data/*.duckdb.*
 data/*.duckdb.wal
 .claude/
+.env
+.env.*
+!.env.example
 
 # Your own data and Garmin tokens; the synthetic sample_data/ is committed.
 private/
+tokens/
 
 # Larger generated datasets for experiments
 sample_data_*/
