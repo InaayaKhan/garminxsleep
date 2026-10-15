@@ -25,11 +25,17 @@ from dashboard.tabs import (
     sleep_quality,
     timing,
 )
-from dashboard.ui import format_duration, install_chart_defaults
+from dashboard.ui import install_chart_defaults
 
 DEFAULT_RANGE_DAYS = 180
 
-st.set_page_config(page_title="garminxsleep", page_icon="🌙", layout="wide")
+st.set_page_config(
+    page_title="garminxsleep",
+    page_icon="🌙",
+    layout="wide",
+    # Charts get the full width; the date range and summary are one click away.
+    initial_sidebar_state="collapsed",
+)
 install_chart_defaults()
 st.title("garminxsleep")
 st.sidebar.caption("Local Garmin and Sleepmeter dashboard")
@@ -80,17 +86,6 @@ view = ViewData(
     history=frames_between(dataset, None, end_date),
 )
 
-days = len(view.selected.daily)
-average_minutes = view.selected.daily["total_sleep_minutes"].mean() if days else 0
-zero_days = int(view.selected.daily["zero_sleep"].sum()) if days else 0
-session_count = len(view.selected.sessions)
-
-st.sidebar.divider()
-st.sidebar.subheader("Summary")
-st.sidebar.metric("Calendar days", days)
-st.sidebar.metric("Average daily sleep", format_duration(float(average_minutes)))
-st.sidebar.metric("Zero-sleep days", zero_days)
-st.sidebar.metric("Recorded sessions", session_count)
 
 # Core sleep views first, then what may influence sleep, then Garmin-only
 # measurements; the raw records table comes last.

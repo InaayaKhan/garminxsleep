@@ -20,6 +20,15 @@ def render(view: ViewData) -> None:
     st.markdown(
         'How much and how well you slept each day. Drag the first three charts sideways to pan back in time; they move together.'
     )
+    # Summary of the selected date range (the sidebar is collapsed by default).
+    daily = view.selected.daily
+    days = len(daily)
+    average_minutes = daily["total_sleep_minutes"].mean() if days else 0
+    days_column, average_column, zero_column, sessions_column = st.columns(4)
+    days_column.metric("Calendar days", days)
+    average_column.metric("Average daily sleep", format_duration(float(average_minutes)))
+    zero_column.metric("Zero-sleep days", int(daily["zero_sleep"].sum()) if days else 0)
+    sessions_column.metric("Recorded sessions", len(view.selected.sessions))
     show_duration_stages = st.toggle(
         "Show sleep stages in duration chart", value=True
     )
