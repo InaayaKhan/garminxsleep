@@ -5,7 +5,8 @@ To use your own data, point ``GARMINXSLEEP_DATA_DIR`` at a folder with the
 same layout (keep it outside Git, for example ``private/``):
 
     <data dir>/
-        settings.json            timezone and Garmin start date (optional)
+        settings.json            timezone, Garmin start date, sleep target,
+                                 daytime activity window (all optional)
         sleep_history_*.csv      Sleepmeter export(s); the newest is used
         aid_colors.json          per-aid chart colours (optional)
         garmin_*_overrides.json  manual merge corrections (optional)
@@ -35,6 +36,20 @@ _SETTINGS: dict[str, str] = (
 
 # IANA name used to show Garmin's UTC timestamps as local time.
 TIMEZONE_NAME = _SETTINGS.get("timezone", "UTC")
+
+# Nightly sleep goal: target lines, the credit/debit default, and sleep debt.
+SLEEP_TARGET_HOURS = float(_SETTINGS.get("sleep_target_hours", 8.0))
+
+
+def _clock_minutes(text: str) -> int:
+    hours, minutes = text.split(":")
+    return int(hours) * 60 + int(minutes)
+
+
+# Activities wholly inside this window (e.g. work-day workouts) can be left out
+# of the activity-to-sleep gap, which is mostly about evening activity.
+DAYTIME_WINDOW_TEXT = tuple(_SETTINGS.get("daytime_activity_window", ("09:00", "17:00")))
+DAYTIME_WINDOW_MINUTES = tuple(_clock_minutes(text) for text in DAYTIME_WINDOW_TEXT)
 
 
 def garmin_start_date() -> date:

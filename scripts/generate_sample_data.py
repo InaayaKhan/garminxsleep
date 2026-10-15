@@ -517,7 +517,12 @@ def write_garmin(
 def write_config() -> None:
     (OUTPUT / "settings.json").write_text(
         json.dumps(
-            {"timezone": TIMEZONE.key, "garmin_start_date": GARMIN_START_DAY.isoformat()},
+            {
+                "timezone": TIMEZONE.key,
+                "garmin_start_date": GARMIN_START_DAY.isoformat(),
+                "sleep_target_hours": 8,
+                "daytime_activity_window": ["09:00", "17:00"],
+            },
             indent=2,
         )
         + "\n",

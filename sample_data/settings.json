@@ -1,4 +1,9 @@
 {
   "timezone": "America/New_York",
-  "garmin_start_date": "2026-05-25"
+  "garmin_start_date": "2026-05-25",
+  "sleep_target_hours": 8,
+  "daytime_activity_window": [
+    "09:00",
+    "17:00"
+  ]
 }

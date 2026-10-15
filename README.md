@@ -46,7 +46,7 @@ Point `GARMINXSLEEP_DATA_DIR` at a folder with the same layout as
 
 ```text
 private/
-├── settings.json              {"timezone": "Area/City", "garmin_start_date": "YYYY-MM-DD"}
+├── settings.json              time zone, Garmin start date, chart targets (below)
 ├── sleep_history_*.csv        Sleepmeter export (the newest file is used)
 ├── aid_colors.json            optional chart colour per sleep aid
 ├── garmin_*_overrides.json    optional manual corrections
@@ -58,7 +58,23 @@ export GARMINXSLEEP_DATA_DIR="$PWD/private"
 streamlit run dashboard/app.py
 ```
 
-Without `garmin_start_date`, Garmin takes over from its first recorded night.
+All settings are optional:
+
+```json
+{
+  "timezone": "Area/City",
+  "garmin_start_date": "YYYY-MM-DD",
+  "sleep_target_hours": 8,
+  "daytime_activity_window": ["09:00", "17:00"]
+}
+```
+
+| Setting | Default | Used for |
+|---|---|---|
+| `timezone` | `UTC` | Showing Garmin's UTC timestamps as local time |
+| `garmin_start_date` | first Garmin night | When Garmin takes over from Sleepmeter |
+| `sleep_target_hours` | `8` | Target lines, the credit/debit default, sleep debt |
+| `daytime_activity_window` | `09:00`–`17:00` | Activities left out of the "excluding daytime" gap chart |
 
 ### Sync Garmin data
 
@@ -82,6 +98,21 @@ python -m dashboard.garmin_sync --include sleep --days 7          # one collecto
 
 Collectors: `sleep`, `hrv`, `daily_health`, `body`, `activities`, `training`,
 `menstrual`.
+
+## Code layout
+
+```text
+dashboard/
+├── app.py          entry point: loads data, sidebar, renders the tabs
+├── config.py       data folder and settings.json
+├── data.py         finding, loading and caching the dataset
+├── model.py        parsing and merging Sleepmeter and Garmin data
+├── storage.py      DuckDB export
+├── ui.py           chart defaults, linked panning, formatting
+├── garmin_sync.py  Garmin Connect downloader
+├── tabs/           one module per tab, each with render(view)
+└── charts/         Plotly figures, one module per tab plus shared common.py
+```
 
 ## Tests
 

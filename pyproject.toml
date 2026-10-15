@@ -16,7 +16,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3"]
-sync = ["garminconnect>=0.2"]
+# Tested with 0.3.17; 0.x minor releases may change the API, so stay on 0.3.
+sync = ["garminconnect>=0.3.17,<0.4"]
 
 [tool.setuptools.packages.find]
 include = ["dashboard*"]
