@@ -1,0 +1,4 @@
+# For Streamlit Community Cloud: installs this project (and the dependencies in
+# pyproject.toml) so `streamlit run dashboard/app.py` can import the dashboard
+# package. Locally, `pip install -e ".[dev]"` does the same plus test tools.
+-e .
