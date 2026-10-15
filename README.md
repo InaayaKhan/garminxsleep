@@ -83,6 +83,17 @@ python -m dashboard.garmin_sync --include sleep --days 7          # one collecto
 Collectors: `sleep`, `hrv`, `daily_health`, `body`, `activities`, `training`,
 `menstrual`.
 
+## Tests
+
+```bash
+pytest
+```
+
+The tests run on `sample_data/` and check the merge rules: session and daily
+totals agree, no night is counted twice, Garmin naps become sessions, nights
+Garmin missed fall back to Sleepmeter, and the Overview charts share a date
+window and hour scale.
+
 ## Regenerating the sample data
 
 ```bash

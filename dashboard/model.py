@@ -503,6 +503,59 @@ def load_combined_sleep_data(
                 "source_file": sleep_path.name,
             }
         )
+        if sleep_date >= garmin_start_date:
+            # Naps are only listed with their times here; before the handover
+            # Sleepmeter's own nap records are used instead.
+            for nap in dto.get("dailyNapDTOS") or []:
+                nap_start_text = nap.get("napStartTimestampGMT")
+                nap_end_text = nap.get("napEndTimestampGMT")
+                if not nap_start_text or not nap_end_text:
+                    continue
+                nap_start = _garmin_timestamp(nap_start_text, local_timezone)
+                nap_end = _garmin_timestamp(nap_end_text, local_timezone)
+                nap_gross = (nap_end - nap_start).total_seconds() / 60
+                nap_minutes = float(nap.get("napTimeSec") or nap_gross * 60) / 60
+                nap_id = hashlib.sha256(
+                    f"garmin-nap|{sleep_date.isoformat()}|{nap_start_text}".encode()
+                ).hexdigest()[:16]
+                sessions.append(
+                    {
+                        "session_id": nap_id,
+                        "source_row": None,
+                        "sleep_date": sleep_date,
+                        "sleep_start": nap_start,
+                        "wake_time": nap_end,
+                        "bedtime": nap_start,
+                        "session_type": "NAP",
+                        "gross_minutes": nap_gross,
+                        "interruption_minutes": max(nap_gross - nap_minutes, 0.0),
+                        "sleep_minutes": nap_minutes,
+                        "zero_duration": False,
+                        "aid_id": "NONE",
+                        "aid_name": "None",
+                        "legacy_garmin_score_10": None,
+                        "holes": "",
+                        "dreams": "",
+                        "hindrances": "",
+                        "tags": "",
+                        "notes": "",
+                        "source": "garmin",
+                        "source_file": sleep_path.name,
+                    }
+                )
+                intervals.append(
+                    {
+                        "session_id": nap_id,
+                        "interval_index": 1,
+                        "sleep_date": sleep_date,
+                        "interval_start": nap_start,
+                        "interval_end": nap_end,
+                        "session_type": "NAP",
+                        "aid_name": "None",
+                        "legacy_garmin_score_10": None,
+                        "source": "garmin",
+                    }
+                )
         if not valid_session:
             continue
 
@@ -881,6 +934,32 @@ def load_combined_sleep_data(
     new_garmin_sessions = garmin_sessions[
         garmin_sessions["sleep_date"] >= garmin_start_date
     ]
+    # Garmin is authoritative from the handover date: Sleepmeter records from
+    # then on would count those nights twice. The exception is a night Garmin
+    # did not record (watch not worn or not synced), where Sleepmeter's record
+    # is used instead of leaving the day empty.
+    garmin_night_dates = (
+        set(
+            new_garmin_sessions.loc[
+                new_garmin_sessions["session_type"] == "NIGHT_SLEEP", "sleep_date"
+            ]
+        )
+        if not new_garmin_sessions.empty
+        else set()
+    )
+    fallback_dates = {
+        sleep_date
+        for sleep_date in historical_sessions["sleep_date"]
+        if sleep_date >= garmin_start_date and sleep_date not in garmin_night_dates
+    }
+    if not new_garmin_sessions.empty:
+        new_garmin_sessions = new_garmin_sessions[
+            ~new_garmin_sessions["sleep_date"].isin(fallback_dates)
+        ]
+    historical_sessions = historical_sessions[
+        (historical_sessions["sleep_date"] < garmin_start_date)
+        | historical_sessions["sleep_date"].isin(fallback_dates)
+    ]
     combined_sessions = pd.concat(
         [historical_sessions, new_garmin_sessions], ignore_index=True
     ).sort_values(["wake_time", "sleep_start"], ignore_index=True)
@@ -981,6 +1060,10 @@ def load_combined_sleep_data(
             ignore_index=True,
         )
 
+    historical_intervals = historical_intervals[
+        (historical_intervals["sleep_date"] < garmin_start_date)
+        | historical_intervals["sleep_date"].isin(fallback_dates)
+    ]
     combined_intervals = pd.concat(
         [historical_intervals, accepted_intervals], ignore_index=True
     )
@@ -1122,7 +1205,7 @@ def load_combined_sleep_data(
     for current_date in pd.date_range(
         historical.coverage_start, coverage_end, freq="D"
     ).date:
-        if current_date < garmin_start_date:
+        if current_date < garmin_start_date or current_date in fallback_dates:
             day_sessions = combined_sessions[
                 combined_sessions["sleep_date"] == current_date
             ]
@@ -1141,6 +1224,8 @@ def load_combined_sleep_data(
                 source_state = "sleepmeter_garmin_matched"
             else:
                 source_state = "sleepmeter_recorded"
+            if current_date >= garmin_start_date:
+                source_state = "sleepmeter_fallback"
             daily_rows.append(
                 {
                     "date": current_date,

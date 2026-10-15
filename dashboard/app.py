@@ -52,7 +52,6 @@ from dashboard.charts import (
     intensity_minutes_vs_subsequent_sleep_figure,
     steps_floors_vs_subsequent_sleep_figure,
     heart_rate_24_hour_heatmap,
-    sleep_regularity_figure,
     sleep_composition_figure,
     wake_up_time_weekend_highlight_figure,
 )
@@ -353,16 +352,17 @@ st.sidebar.metric("Average daily sleep", format_duration(float(average_minutes))
 st.sidebar.metric("Zero-sleep days", zero_days)
 st.sidebar.metric("Recorded sessions", session_count)
 
-overview_tab, timing_tab, relationships_tab, experimental_tab, experimental_2_tab, experimental_3_tab, aids_tab, distributions_tab, records_tab = st.tabs(
+# Core sleep views first, then what may influence sleep, then Garmin-only
+# measurements; the raw records table comes last.
+overview_tab, distributions_tab, timing_tab, aids_tab, subsequent_sleep_tab, relationships_tab, garmin_tab, records_tab = st.tabs(
     [
         "Overview",
-        "Timing",
-        "Relationships",
-        "Experimental",
-        "Experimental 2",
-        "Experimental 3",
-        "Aids",
         "Trends & distributions",
+        "Timing",
+        "Aids",
+        "Subsequent sleep",
+        "Relationships",
+        "Garmin",
         "Records",
     ]
 )
@@ -431,34 +431,21 @@ with overview_tab:
         "menstrual phase strip uses the same colors and cycle boundaries as the "
         "duration chart."
     )
-    activity_heatmap_column, intensity_heatmap_column = st.columns(2)
-    with activity_heatmap_column:
-        st.plotly_chart(
-            calendar_activity_heatmap(filtered_daily, filtered_activities),
-            width="stretch",
-            config={"displaylogo": False},
-        )
-    with intensity_heatmap_column:
-        st.plotly_chart(
-            calendar_intensity_minutes_heatmap(
-                filtered_daily, filtered_garmin_metrics
-            ),
-            width="stretch",
-            config={"displaylogo": False},
-        )
-    duration_heatmap_column, score_heatmap_column = st.columns(2)
-    with duration_heatmap_column:
-        st.plotly_chart(
-            calendar_sleep_heatmap(filtered_daily),
-            width="stretch",
-            config={"displaylogo": False},
-        )
-    with score_heatmap_column:
-        st.plotly_chart(
-            calendar_sleep_score_heatmap(filtered_daily, filtered_sessions),
-            width="stretch",
-            config={"displaylogo": False},
-        )
+    st.plotly_chart(
+        sleep_composition_figure(
+            history_garmin_metrics,
+            view_start=start_date,
+            view_end=end_date,
+            extent_start=dataset.coverage_start,
+            extent_end=end_date,
+        ),
+        width="stretch",
+        config={"displaylogo": False},
+    )
+    st.caption(
+        "Each recorded Garmin night is normalized to 100%, showing the relative "
+        "share of Deep, REM, Light, and Awake time."
+    )
 
 with timing_tab:
     asleep_highlight_column, wake_highlight_column = st.columns(2)
@@ -576,39 +563,20 @@ with relationships_tab:
         "Sleep efficiency excludes zero-duration placeholders because they have no "
         "sleep window. Garmin Sleep scores use the 0–100 scale."
     )
-
-with experimental_tab:
     st.plotly_chart(
-        sleep_score_components_figure(filtered_garmin_metrics),
+        multifactor_relationships_figure(
+            filtered_daily,
+            filtered_sessions,
+            filtered_activities,
+            filtered_garmin_metrics,
+            filtered_menstrual,
+        ),
         width="stretch",
         config={"displaylogo": False},
     )
     st.caption(
-        "Component colors are Garmin's Poor, Fair, Good, and Excellent qualifiers. "
-        "Hover for the underlying percentage or measurement where Garmin provides it."
-    )
-    st.plotly_chart(
-        sleep_composition_figure(filtered_garmin_metrics),
-        width="stretch",
-        config={"displaylogo": False},
-    )
-    st.caption(
-        "Each recorded Garmin night is normalized to 100%, showing the relative "
-        "share of Deep, REM, Light, and Awake time."
-    )
-    st.plotly_chart(
-        overnight_recovery_figure(filtered_garmin_metrics),
-        width="stretch",
-        config={"displaylogo": False},
-    )
-    st.caption(
-        "Aligned overnight recovery measures from Garmin. Missing values mean the "
-        "watch or Garmin response did not provide that measurement."
-    )
-    st.plotly_chart(
-        daily_physiological_load_figure(filtered_garmin_metrics),
-        width="stretch",
-        config={"displaylogo": False},
+        "Multifactor coefficients are standardized associations, not causal effects. "
+        "Positive bars move with the outcome after accounting for the other displayed predictors."
     )
     st.plotly_chart(
         menstrual_phase_comparisons_figure(
@@ -624,16 +592,8 @@ with experimental_tab:
         "Phase comparisons include only dates where Garmin supplied both the cycle "
         "phase and the corresponding sleep or recovery measurement."
     )
-    st.plotly_chart(
-        awakenings_efficiency_figure(filtered_garmin_metrics),
-        width="stretch",
-        config={"displaylogo": False},
-    )
-    st.caption(
-        "Efficiency is asleep stage time divided by asleep plus awake stage time. "
-        "Garmin did not provide numeric restless-moment counts, so its qualitative "
-        "Restlessness rating is shown instead."
-    )
+
+with subsequent_sleep_tab:
     activity_predictor = st.radio(
         "Activity predictor",
         ["Activity duration", "Time from activity to sleep"],
@@ -657,8 +617,6 @@ with experimental_tab:
         "Each activity day is paired with the first night sleep starting after that "
         "day's final recorded activity. Lines show simple overall trends, not causation."
     )
-
-with experimental_2_tab:
     st.plotly_chart(
         activity_type_comparison_figure(
             filtered_activities, filtered_sessions, filtered_garmin_metrics
@@ -672,62 +630,6 @@ with experimental_2_tab:
         ),
         width="stretch",
         config={"displaylogo": False},
-    )
-    st.plotly_chart(
-        sleep_regularity_figure(filtered_sessions),
-        width="stretch",
-        config={"displaylogo": False},
-    )
-    st.caption(
-        "This is a custom 0–100 timing-consistency score based on changes in "
-        "sleep onset and wake time between adjacent nights; it is not the formal "
-        "research Sleep Regularity Index."
-    )
-    intraday_dates = sorted(filtered_intraday["date"].dropna().unique(), reverse=True)
-    if intraday_dates:
-        selected_intraday_date = st.selectbox(
-            "Intraday recovery date", intraday_dates, key="intraday_recovery_date"
-        )
-        st.plotly_chart(
-            intraday_recovery_timeline_figure(
-                filtered_intraday,
-                filtered_activities,
-                filtered_sessions,
-                selected_intraday_date,
-            ),
-            width="stretch",
-            config={"displaylogo": False},
-        )
-    else:
-        st.info("No intraday recovery samples in the selected date range.")
-    st.plotly_chart(
-        multifactor_relationships_figure(
-            filtered_daily,
-            filtered_sessions,
-            filtered_activities,
-            filtered_garmin_metrics,
-            filtered_menstrual,
-        ),
-        width="stretch",
-        config={"displaylogo": False},
-    )
-    st.caption(
-        "Multifactor coefficients are standardized associations, not causal effects. "
-        "Positive bars move with the outcome after accounting for the other displayed predictors."
-    )
-
-with experimental_3_tab:
-    st.plotly_chart(
-        heart_rate_24_hour_heatmap(
-            filtered_intraday, filtered_activities, start_date, end_date
-        ),
-        width="stretch",
-        config={"displaylogo": False, "scrollZoom": False},
-    )
-    st.plotly_chart(
-        daily_calories_stacked_figure(filtered_garmin_metrics),
-        width="stretch",
-        config={"displaylogo": False, "scrollZoom": False},
     )
     st.plotly_chart(
         intensity_minutes_vs_subsequent_sleep_figure(
@@ -753,6 +655,73 @@ with experimental_3_tab:
             filtered_activities,
             filtered_sessions,
             exclude_daytime_activities=True,
+        ),
+        width="stretch",
+        config={"displaylogo": False, "scrollZoom": False},
+    )
+
+with garmin_tab:
+    st.plotly_chart(
+        sleep_score_components_figure(filtered_garmin_metrics),
+        width="stretch",
+        config={"displaylogo": False},
+    )
+    st.caption(
+        "Component colors are Garmin's Poor, Fair, Good, and Excellent qualifiers. "
+        "Hover for the underlying percentage or measurement where Garmin provides it."
+    )
+    st.plotly_chart(
+        overnight_recovery_figure(filtered_garmin_metrics),
+        width="stretch",
+        config={"displaylogo": False},
+    )
+    st.caption(
+        "Aligned overnight recovery measures from Garmin. Missing values mean the "
+        "watch or Garmin response did not provide that measurement."
+    )
+    load_column, calories_column = st.columns(2)
+    with load_column:
+        st.plotly_chart(
+            daily_physiological_load_figure(filtered_garmin_metrics),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    with calories_column:
+        st.plotly_chart(
+            daily_calories_stacked_figure(filtered_garmin_metrics),
+            width="stretch",
+            config={"displaylogo": False, "scrollZoom": False},
+        )
+    st.plotly_chart(
+        awakenings_efficiency_figure(filtered_garmin_metrics),
+        width="stretch",
+        config={"displaylogo": False},
+    )
+    st.caption(
+        "Efficiency is asleep stage time divided by asleep plus awake stage time. "
+        "Garmin did not provide numeric restless-moment counts, so its qualitative "
+        "Restlessness rating is shown instead."
+    )
+    intraday_dates = sorted(filtered_intraday["date"].dropna().unique(), reverse=True)
+    if intraday_dates:
+        selected_intraday_date = st.selectbox(
+            "Intraday recovery date", intraday_dates, key="intraday_recovery_date"
+        )
+        st.plotly_chart(
+            intraday_recovery_timeline_figure(
+                filtered_intraday,
+                filtered_activities,
+                filtered_sessions,
+                selected_intraday_date,
+            ),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    else:
+        st.info("No intraday recovery samples in the selected date range.")
+    st.plotly_chart(
+        heart_rate_24_hour_heatmap(
+            filtered_intraday, filtered_activities, start_date, end_date
         ),
         width="stretch",
         config={"displaylogo": False, "scrollZoom": False},
@@ -823,32 +792,38 @@ with aids_tab:
                 "change is saved. Clear aid applies None from this date forward. "
                 "Nothing is written back to Garmin Connect."
             )
-    st.plotly_chart(
-        aid_score_figure(filtered_sessions),
-        width="stretch",
-        config={"displaylogo": False},
-    )
-    st.plotly_chart(
-        aid_figure(filtered_sessions),
-        width="stretch",
-        config={"displaylogo": False},
-    )
-    st.plotly_chart(
-        aid_sleep_stage_composition_figure(
-            filtered_sessions, filtered_sleep_stages
-        ),
-        width="stretch",
-        config={"displaylogo": False},
-    )
-    st.plotly_chart(
-        aid_sleep_stage_composition_figure(
-            filtered_sessions,
-            filtered_sleep_stages,
-            use_stage_duration=True,
-        ),
-        width="stretch",
-        config={"displaylogo": False},
-    )
+    aid_score_column, aid_duration_column = st.columns(2)
+    with aid_score_column:
+        st.plotly_chart(
+            aid_score_figure(filtered_sessions),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    with aid_duration_column:
+        st.plotly_chart(
+            aid_figure(filtered_sessions),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    stage_share_column, stage_hours_column = st.columns(2)
+    with stage_share_column:
+        st.plotly_chart(
+            aid_sleep_stage_composition_figure(
+                filtered_sessions, filtered_sleep_stages
+            ),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    with stage_hours_column:
+        st.plotly_chart(
+            aid_sleep_stage_composition_figure(
+                filtered_sessions,
+                filtered_sleep_stages,
+                use_stage_duration=True,
+            ),
+            width="stretch",
+            config={"displaylogo": False},
+        )
     st.plotly_chart(
         aid_duration_timeline_figure(
             history_daily,
@@ -919,6 +894,35 @@ with distributions_tab:
         "−24:00. The shaded region is the mean cumulative balance ± one standard "
         "deviation; the solid diagonal line is the overall trend."
     )
+
+    activity_heatmap_column, intensity_heatmap_column = st.columns(2)
+    with activity_heatmap_column:
+        st.plotly_chart(
+            calendar_activity_heatmap(filtered_daily, filtered_activities),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    with intensity_heatmap_column:
+        st.plotly_chart(
+            calendar_intensity_minutes_heatmap(
+                filtered_daily, filtered_garmin_metrics
+            ),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    duration_heatmap_column, score_heatmap_column = st.columns(2)
+    with duration_heatmap_column:
+        st.plotly_chart(
+            calendar_sleep_heatmap(filtered_daily),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    with score_heatmap_column:
+        st.plotly_chart(
+            calendar_sleep_score_heatmap(filtered_daily, filtered_sessions),
+            width="stretch",
+            config={"displaylogo": False},
+        )
 
 with records_tab:
     display = filtered_sessions[

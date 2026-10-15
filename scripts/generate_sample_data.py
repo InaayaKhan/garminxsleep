@@ -30,7 +30,9 @@ LAST_DAY = date(2026, 8, 30)
 SLEEPMETER_EXPORT_DAY = date(2026, 6, 7)
 GARMIN_FIRST_DAY = date(2026, 5, 11)
 GARMIN_START_DAY = date(2026, 5, 25)  # Garmin is authoritative from here on
-WATCH_OFF_DAY = date(2026, 6, 3)  # watch not worn: Garmin has no sleep
+# Watch not worn, so Garmin has no sleep: 3 June falls back to Sleepmeter;
+# 14 July is after the Sleepmeter export, so it has no data at all.
+WATCH_OFF_DAYS = {date(2026, 6, 3), date(2026, 7, 14)}
 MISSING_DAY = date(2026, 4, 17)  # nothing logged in Sleepmeter
 ZERO_PLACEHOLDER_DAYS = {date(2026, 3, 28), date(2026, 5, 2)}
 FIRST_CYCLE_START = date(2026, 3, 5)
@@ -47,6 +49,10 @@ AID_SCHEDULE = [  # (first day, aid id)
     (date(2026, 5, 1), "NONE"),
     (date(2026, 5, 21), "CUSTOM_1002"),
     (date(2026, 6, 8), "NONE"),
+    (date(2026, 7, 1), "CUSTOM_1003"),
+    (date(2026, 7, 20), "NONE"),
+    (date(2026, 8, 1), "CUSTOM_1001"),
+    (date(2026, 8, 21), "NONE"),
 ]
 ACTIVITY_TYPES = [
     ("running", "Running", 10.5),
@@ -307,7 +313,7 @@ def write_garmin(
         _, cycle_start, phase = cycle_info(day)
 
         # Sleep, stages and score
-        if day == WATCH_OFF_DAY or night.zero:
+        if day in WATCH_OFF_DAYS or night.zero:
             dump("sleep", day, {"dailySleepDTO": {"calendarDate": day.isoformat()}})
             hrv = None
         else:
@@ -348,6 +354,15 @@ def write_garmin(
                         "calendarDate": day.isoformat(),
                         "sleepTimeSeconds": asleep,
                         "napTimeSeconds": nap.minutes * 60 if nap else 0,
+                        "dailyNapDTOS": [
+                            {
+                                "napStartTimestampGMT": gmt_text(nap.start),
+                                "napEndTimestampGMT": gmt_text(nap.start + timedelta(minutes=nap.minutes)),
+                                "napTimeSec": nap.minutes * 60,
+                            }
+                        ]
+                        if nap
+                        else [],
                         "sleepStartTimestampGMT": ms(night.sleep_start),
                         "sleepEndTimestampGMT": ms(night.wake_time),
                         "sleepStartTimestampLocal": ms(night.sleep_start.replace(tzinfo=UTC)),
@@ -454,7 +469,7 @@ def write_garmin(
         asleep_windows = [
             (n.sleep_start, n.wake_time)
             for n in (night, nights_by_day.get(day + timedelta(days=1)))
-            if n is not None and not n.zero and day != WATCH_OFF_DAY
+            if n is not None and not n.zero and day not in WATCH_OFF_DAYS
         ]
         active_windows = [(a.start, a.start + timedelta(minutes=a.minutes)) for a in todays]
 
@@ -528,6 +543,8 @@ def write_config() -> None:
                 date(2026, 6, 8).isoformat(): "None",
                 date(2026, 7, 1).isoformat(): AIDS["CUSTOM_1003"],
                 date(2026, 7, 20).isoformat(): "None",
+                date(2026, 8, 1).isoformat(): AIDS["CUSTOM_1001"],
+                date(2026, 8, 21).isoformat(): "None",
             },
             indent=2,
         )

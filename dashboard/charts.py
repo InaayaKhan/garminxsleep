@@ -16,6 +16,7 @@ from dashboard.config import DATA_ROOT, TIMEZONE_NAME
 NIGHT_BAR_COLOR = "#5B32D6"
 NAP_BAR_COLOR = "#087CFF"
 ZERO_COLOR = "#ff3030"
+NO_DATA_COLOR = "#6B7280"
 AVERAGE_3_COLOR = "#E8793F"
 AVERAGE_7_COLOR = "#E6B84F"
 AVERAGE_28_COLOR = "#4DB88A"
@@ -91,6 +92,30 @@ def hour_px(figure: go.Figure) -> float:
     domain_start, domain_end = layout.yaxis.domain or (0.0, 1.0)
     range_start, range_end = layout.yaxis.range
     return plot_height * (domain_end - domain_start) / (range_end - range_start)
+
+
+def _add_no_data_markers(figure: go.Figure, frame: pd.DataFrame) -> None:
+    """Mark days with no sleep record from any source in grey.
+
+    Unlike red zero-sleep markers, these say nothing about how long the person
+    slept: the watch was not worn or not synced and Sleepmeter has no record.
+    """
+    no_data = frame[frame["total_sleep_minutes"].isna()]
+    if no_data.empty:
+        return
+    figure.add_trace(
+        go.Bar(
+            name="No data",
+            x=no_data["date_plot"],
+            y=[0.08] * len(no_data),
+            base=[0] * len(no_data),
+            marker=dict(color=NO_DATA_COLOR, line=dict(width=0)),
+            hovertemplate=(
+                "<b>No data</b><br>%{x|%d/%m/%Y}<br>"
+                "No Garmin or Sleepmeter record<extra></extra>"
+            ),
+        )
+    )
 
 
 def _stacked_bar_top(figure: go.Figure) -> float:
@@ -825,6 +850,7 @@ def sleep_stage_schedule_figure(
             )
         )
 
+    hrv_top = None
     if garmin_metrics is not None and not garmin_metrics.empty:
         hrv_frame = garmin_metrics.copy()
         hrv_frame["date_plot"] = pd.to_datetime(hrv_frame["date"]) + pd.Timedelta(
@@ -833,6 +859,9 @@ def sleep_stage_schedule_figure(
         hrv_frame["nightly_hrv"] = hrv_frame[
             "hrv_last_night_average"
         ].fillna(hrv_frame["overnight_hrv"])
+        hrv_top = pd.concat(
+            [hrv_frame["nightly_hrv"], hrv_frame["hrv_weekly_average"]]
+        ).max()
         figure.add_trace(
             go.Scatter(
                 name="Nightly average HRV",
@@ -1018,6 +1047,12 @@ def sleep_stage_schedule_figure(
             title="HRV (ms)",
             overlaying="y",
             side="right",
+            # The HRV lines start hidden, so autorange would label an empty
+            # 0-4 axis; size it from the data instead.
+            range=[0, hrv_top * 1.1] if pd.notna(hrv_top) and hrv_top else None,
+            # Own round ticks rather than ones synced to the time-of-day grid.
+            tickmode="linear",
+            dtick=10,
             rangemode="tozero",
             showgrid=False,
             zeroline=False,
@@ -1227,8 +1262,19 @@ def overnight_recovery_figure(metrics: pd.DataFrame) -> go.Figure:
     return figure
 
 
-def sleep_composition_figure(metrics: pd.DataFrame) -> go.Figure:
-    """Show each Garmin night's sleep-stage composition normalized to 100%."""
+def sleep_composition_figure(
+    metrics: pd.DataFrame,
+    view_start: date | None = None,
+    view_end: date | None = None,
+    extent_start: date | None = None,
+    extent_end: date | None = None,
+) -> go.Figure:
+    """Show each Garmin night's sleep-stage composition normalized to 100%.
+
+    Opens on ``view_start``..``view_end`` and pans across ``extent_start``..
+    ``extent_end`` (default: the metrics' own dates), matching the other
+    Overview date charts when given their extent.
+    """
     figure = go.Figure()
     if metrics.empty:
         figure.add_annotation(
@@ -1259,7 +1305,7 @@ def sleep_composition_figure(metrics: pd.DataFrame) -> go.Figure:
         figure.add_trace(
             go.Bar(
                 name=stage_name,
-                x=pd.to_datetime(frame["date"]),
+                x=pd.to_datetime(frame["date"]) + pd.Timedelta(hours=12),
                 y=percentages,
                 marker=dict(color=colors[stage_name], line=dict(width=0)),
                 customdata=frame[[column]],
@@ -1274,11 +1320,19 @@ def sleep_composition_figure(metrics: pd.DataFrame) -> go.Figure:
         barmode="stack",
         bargap=0.2,
         height=470,
-        margin=dict(l=82, r=28, t=78, b=60),
-        legend=dict(orientation="h", yanchor="bottom", y=1.01, x=0),
-        xaxis=dict(title="Sleep date", tickformat="%d/%m", showgrid=False),
+        margin=dict(**DATE_CHART_SIDE_MARGINS, t=64, b=72),
+        xaxis=dict(
+            title="Sleep date", type="date", tickformat="%d/%m", tickangle=0, showgrid=False
+        ),
         yaxis=dict(title="Share of sleep window", range=[0, 100], ticksuffix="%"),
         hovermode="x unified",
+    )
+    _pannable_date_view(
+        figure,
+        extent_start or frame["date"].min(),
+        extent_end or frame["date"].max(),
+        view_start,
+        view_end,
     )
     return figure
 
@@ -1903,46 +1957,6 @@ def activity_intensity_effect_figure(
         title="Activity intensity and heart-rate load",
         height=650,
         margin=dict(l=76, r=30, t=95, b=65),
-    )
-    return figure
-
-
-def sleep_regularity_figure(sessions: pd.DataFrame) -> go.Figure:
-    nights = sessions[
-        (sessions["session_type"] == "NIGHT_SLEEP") & (~sessions["zero_duration"])
-    ].sort_values("sleep_date").copy()
-    nights["onset"] = nights["sleep_start"].map(lambda value: value.hour * 60 + value.minute)
-    nights["wake"] = nights["wake_time"].map(lambda value: value.hour * 60 + value.minute)
-
-    def circular_difference(current: float, previous: float) -> float:
-        difference = abs(current - previous) % 1440
-        return min(difference, 1440 - difference)
-
-    nights["onset_change"] = [
-        float("nan")
-        if index == 0
-        else circular_difference(nights.iloc[index]["onset"], nights.iloc[index - 1]["onset"])
-        for index in range(len(nights))
-    ]
-    nights["wake_change"] = [
-        float("nan")
-        if index == 0
-        else circular_difference(nights.iloc[index]["wake"], nights.iloc[index - 1]["wake"])
-        for index in range(len(nights))
-    ]
-    nights["regularity"] = (
-        100 - (nights["onset_change"] + nights["wake_change"]) / 1440 * 100
-    ).clip(0, 100)
-    nights["regularity_7"] = nights["regularity"].rolling(7, min_periods=2).mean()
-    figure = go.Figure()
-    figure.add_trace(go.Scatter(name="Daily regularity", x=nights["sleep_date"], y=nights["regularity"], mode="lines", line=dict(color="#8F6BFF", width=1)))
-    figure.add_trace(go.Scatter(name="7-day average", x=nights["sleep_date"], y=nights["regularity_7"], mode="lines", line=dict(color="#E6B84F", width=1.5, dash="dot")))
-    figure.update_layout(
-        title="Sleep timing regularity",
-        height=430,
-        yaxis=dict(title="Regularity score", range=[0, 100]),
-        xaxis=dict(title="Sleep date", tickformat="%d/%m"),
-        legend=dict(orientation="h", y=1.02),
     )
     return figure
 
@@ -2954,6 +2968,7 @@ def daily_duration_figure(
                 hovertemplate="%{x}<br>Zero sleep<br>%{customdata[0]}<extra></extra>",
             )
         )
+    _add_no_data_markers(figure, frame)
 
     figure.update_layout(
         title="Daily sleep duration",
@@ -3748,16 +3763,31 @@ def aid_sleep_stage_composition_figure(
         else:
             for stage in stage_order:
                 nightly[stage] = nightly[stage] / nightly["stage_total"] * 100
-        composition = nightly.groupby("aid_name")[stage_order].mean()
-        counts = nightly.groupby("aid_name")["session_id"].nunique()
+        # Every aid with nights in range is shown, with how many of its nights
+        # have stage data; aids with none (e.g. only Sleepmeter-era nights) get
+        # an empty, labelled slot instead of silently disappearing.
+        all_nights = nights.groupby("aid_name")["session_id"].nunique()
+        composition = (
+            nightly.groupby("aid_name")[stage_order].mean().reindex(all_nights.index)
+        )
+        counts = (
+            nightly.groupby("aid_name")["session_id"]
+            .nunique()
+            .reindex(all_nights.index, fill_value=0)
+        )
         aid_order = sorted(
-            composition.index.tolist(),
+            all_nights.index.tolist(),
             key=lambda aid: (
                 str(aid).casefold() != "none",
                 -int(counts.loc[aid]),
+                -int(all_nights.loc[aid]),
                 str(aid).casefold(),
             ),
         )
+        labels = {
+            aid: f"{aid}<br>{int(counts.loc[aid])} of {int(all_nights.loc[aid])} nights"
+            for aid in aid_order
+        }
         colors = {
             "Deep": "#331B8C",
             "REM": "#EE55C0",
@@ -3769,17 +3799,26 @@ def aid_sleep_stage_composition_figure(
             figure.add_trace(
                 go.Bar(
                     name=stage,
-                    x=[str(aid) for aid in aid_order],
+                    x=[labels[aid] for aid in aid_order],
                     y=[composition.loc[aid, stage] for aid in aid_order],
                     marker=dict(color=colors[stage], line_width=0),
-                    customdata=[[int(counts.loc[aid])] for aid in aid_order],
+                    customdata=[[str(aid)] for aid in aid_order],
                     hovertemplate=(
-                        f"%{{x}}<br>{stage}: %{{y:.2f}}"
-                        f"{' h' if use_stage_duration else '%'}<br>"
-                        "Nights with stages: %{customdata[0]}<extra></extra>"
+                        f"%{{customdata[0]}}<br>{stage}: %{{y:.2f}}"
+                        f"{' h' if use_stage_duration else '%'}<extra></extra>"
                     ),
                 )
             )
+        for aid in aid_order:
+            if counts.loc[aid] == 0:
+                figure.add_annotation(
+                    x=labels[aid],
+                    y=0,
+                    yanchor="bottom",
+                    text="No stage data",
+                    showarrow=False,
+                    font=dict(color="#9CA3AF"),
+                )
     figure.update_layout(
         title=(
             "Average sleep-stage duration by recorded aid"
@@ -3879,6 +3918,7 @@ def aid_duration_timeline_figure(
                 hovertemplate="<b>Zero sleep</b><br>%{x|%d/%m/%Y}<extra></extra>",
             )
         )
+    _add_no_data_markers(figure, frame)
 
     scored_nights = nights[nights["legacy_garmin_score_10"].notna()]
     daily_scores = scored_nights.groupby("sleep_date")["legacy_garmin_score_10"].mean() * 10
