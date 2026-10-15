@@ -1,1 +1,1 @@
-[]
+[{"activityId":18000000809,"activityName":"Strength","activityType":{"typeKey":"strength_training"},"startTimeGMT":"2026-05-28 22:21:00","endTimeGMT":"2026-05-28 23:04:00","elapsedDuration":2580.0,"calories":258,"averageHR":127,"maxHR":170,"moderateIntensityMinutes":22,"vigorousIntensityMinutes":4,"hrTimeInZone_1":225.6,"hrTimeInZone_2":856.0,"hrTimeInZone_3":426.2,"hrTimeInZone_4":525.4,"hrTimeInZone_5":546.7}]

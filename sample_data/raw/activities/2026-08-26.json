@@ -1,1 +1,1 @@
-[]
+[{"activityId":18000001706,"activityName":"Running","activityType":{"typeKey":"running"},"startTimeGMT":"2026-08-26 22:12:00","endTimeGMT":"2026-08-26 23:11:00","elapsedDuration":3540.0,"calories":620,"averageHR":132,"maxHR":161,"moderateIntensityMinutes":30,"vigorousIntensityMinutes":21,"hrTimeInZone_1":815.8,"hrTimeInZone_2":736.4,"hrTimeInZone_3":950.6,"hrTimeInZone_4":132.3,"hrTimeInZone_5":905.0}]

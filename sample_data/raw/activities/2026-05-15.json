@@ -1,1 +1,1 @@
-[]
+[{"activityId":18000000696,"activityName":"Cycling","activityType":{"typeKey":"cycling"},"startTimeGMT":"2026-05-15 11:00:00","endTimeGMT":"2026-05-15 12:06:00","elapsedDuration":3960.0,"calories":528,"averageHR":145,"maxHR":157,"moderateIntensityMinutes":33,"vigorousIntensityMinutes":7,"hrTimeInZone_1":1071.7,"hrTimeInZone_2":974.3,"hrTimeInZone_3":1627.3,"hrTimeInZone_4":204.2,"hrTimeInZone_5":82.5}]

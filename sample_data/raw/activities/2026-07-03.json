@@ -1,1 +1,1 @@
-[]
+[{"activityId":18000001163,"activityName":"Walk","activityType":{"typeKey":"walking"},"startTimeGMT":"2026-07-03 11:05:00","endTimeGMT":"2026-07-03 11:40:00","elapsedDuration":2100.0,"calories":158,"averageHR":142,"maxHR":180,"moderateIntensityMinutes":18,"vigorousIntensityMinutes":4,"hrTimeInZone_1":498.2,"hrTimeInZone_2":545.1,"hrTimeInZone_3":471.8,"hrTimeInZone_4":84.5,"hrTimeInZone_5":500.3}]
