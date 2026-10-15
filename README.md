@@ -1,12 +1,25 @@
 # garminxsleep
 
-A local dashboard that merges historical Sleepmeter exports with Garmin
-Connect sleep, HRV, activity, and health data, then charts
-how training load, bedtime regularity, sleep debt, sleep aids, and the menstrual
-cycle relate to sleep.
+A local dashboard that combines historical Sleepmeter records with Garmin
+Connect sleep, HRV, activity, and health data. It visualizes how sleep relates
+to training load, bedtime regularity, sleep debt, sleep aids, and the menstrual
+cycle.
 
-It ships with a **synthetic dataset**, so it runs without any accounts or
-personal data.
+[**Open the live demo →**](https://garminxsleep.streamlit.app/)
+
+The hosted demo uses generated synthetic data. It contains no Garmin
+credentials or personal health records, and the project runs locally without
+connecting an account.
+
+## Preview
+
+### Sleep overview
+
+![Daily sleep duration, recovery metrics, and sleep stages across a 24-hour schedule](screenshots/sleep_overview.png)
+
+### Multifactor relationships
+
+![Multifactor sleep, recovery, and activity analysis](screenshots/multifactor.png)
 
 ## Run it
 
@@ -69,12 +82,12 @@ All settings are optional:
 }
 ```
 
-| Setting | Default | Used for |
-|---|---|---|
-| `timezone` | `UTC` | Showing Garmin's UTC timestamps as local time |
-| `garmin_start_date` | first Garmin night | When Garmin takes over from Sleepmeter |
-| `sleep_target_hours` | `8` | Target lines, the credit/debit default, sleep debt |
-| `daytime_activity_window` | `09:00`–`17:00` | Activities left out of the "excluding daytime" gap chart |
+| Setting                   | Default            | Used for                                                 |
+| ------------------------- | ------------------ | -------------------------------------------------------- |
+| `timezone`                | `UTC`              | Showing Garmin's UTC timestamps as local time            |
+| `garmin_start_date`       | first Garmin night | When Garmin takes over from Sleepmeter                   |
+| `sleep_target_hours`      | `8`                | Target lines, the credit/debit default, sleep debt       |
+| `daytime_activity_window` | `09:00`–`17:00`    | Activities left out of the "excluding daytime" gap chart |
 
 ### Sync Garmin data
 
