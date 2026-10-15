@@ -27,6 +27,11 @@ AVERAGE_7_COLOR = "#E6B84F"
 
 
 SLEEP_SCORE_PINK = "#FF7AB6"
+# One colour per sleep outcome, shared by the "vs the following night" charts.
+DURATION_COLOR = NIGHT_BAR_COLOR
+SCORE_COLOR = SLEEP_SCORE_PINK
+HRV_COLOR = "#4DB88A"
+STRESS_COLOR = "#E6B84F"
 
 
 STATS_GREEN = "#00ee28"

@@ -112,9 +112,9 @@ def render(view: ViewData) -> None:
         config={"displaylogo": False},
     )
     st.caption(
-        f"Sleepmeter-style credit/debit uses a {format_duration(credit_target_minutes)} "
-        "daily target and a 24-hour "
-        "balance scale: meeting the target is neutral and zero sleep contributes "
-        "−24:00. The shaded region is the mean cumulative balance ± one standard "
-        "deviation; the solid diagonal line is the overall trend."
+        "Each day adds the hours slept (naps included) minus the "
+        f"{format_duration(credit_target_minutes)} target. The top panel is the running "
+        "total over the selected range, with its trend; the bottom panel is the "
+        "balance over the last 14 days, red when behind. Days without any sleep "
+        "record are left out."
     )

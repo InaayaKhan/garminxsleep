@@ -7,6 +7,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from dashboard.charts.common import (
+    DURATION_COLOR,
+    HRV_COLOR,
+    SCORE_COLOR,
+    STRESS_COLOR,
     WEEKDAY_ORDER,
     _spearman_summary,
 )
@@ -21,16 +25,15 @@ def activity_effect_on_sleep_figure(
 ) -> go.Figure:
     """Relate each activity day's load to its next recorded night sleep."""
     panels = (
-        ("Subsequent sleep duration", "sleep_hours", "hours", "#5B32D6"),
-        ("Subsequent Sleep score", "sleep_score", "score", "#FF7AB6"),
-        ("Subsequent overnight HRV", "overnight_hrv_display", "ms", "#4DB88A"),
-        ("Subsequent sleep stress", "average_sleep_stress", "", "#E6B84F"),
+        ("Subsequent sleep duration", "sleep_hours", "hours", DURATION_COLOR),
+        ("Subsequent Sleep score", "sleep_score", "score", SCORE_COLOR),
+        ("Subsequent overnight HRV", "overnight_hrv_display", "ms", HRV_COLOR),
+        ("Subsequent sleep stress", "average_sleep_stress", "", STRESS_COLOR),
     )
+    # One row of four, like the other "vs the following night" charts.
     figure = make_subplots(
-        rows=2,
-        cols=2,
-        vertical_spacing=0.17,
-        horizontal_spacing=0.10,
+        rows=1,
+        cols=4,
         subplot_titles=[panel[0] for panel in panels],
     )
     nights = sessions[
@@ -138,9 +141,7 @@ def activity_effect_on_sleep_figure(
                 ]
             ]
             for index, (title, column, unit, color) in enumerate(panels):
-                row, col = divmod(index, 2)
-                row += 1
-                col += 1
+                row, col = 1, index + 1
                 figure.add_trace(
                     go.Scatter(
                         name=title,
@@ -205,8 +206,8 @@ def activity_effect_on_sleep_figure(
             if predictor == "gap"
             else "Activity duration vs subsequent sleep"
         ),
-        height=650,
-        margin=dict(l=76, r=32, t=90, b=62),
+        height=500,
+        margin=dict(l=76, r=34, t=90, b=68),
     )
     return figure
 
@@ -557,12 +558,12 @@ def intensity_minutes_vs_subsequent_sleep_figure(
         ],
     )
     panels = (
-        ("sleep_hours", "Hours asleep", None),
-        ("sleep_score", "Garmin Sleep score", [0, 100]),
-        ("overnight_hrv", "Overnight HRV (ms)", None),
-        ("sleep_stress", "Average sleep stress", None),
+        ("sleep_hours", "Hours asleep", None, DURATION_COLOR),
+        ("sleep_score", "Garmin Sleep score", [0, 100], SCORE_COLOR),
+        ("overnight_hrv", "Overnight HRV (ms)", None, HRV_COLOR),
+        ("sleep_stress", "Average sleep stress", None, STRESS_COLOR),
     )
-    for column_index, (outcome, y_title, y_range) in enumerate(panels, 1):
+    for column_index, (outcome, y_title, y_range, color) in enumerate(panels, 1):
         if frame.empty:
             continue
         valid = frame[["intensity_minutes", outcome, "date", "sleep_date"]].dropna()
@@ -571,7 +572,7 @@ def intensity_minutes_vs_subsequent_sleep_figure(
                 x=valid["intensity_minutes"],
                 y=valid[outcome],
                 mode="markers",
-                marker=dict(color="#2FD6A3", size=8, opacity=0.82),
+                marker=dict(color=color, size=8, opacity=0.82),
                 customdata=valid[["date", "sleep_date"]],
                 hovertemplate=(
                     "Activity day: %{customdata[0]}<br>"
@@ -674,14 +675,14 @@ def steps_floors_vs_subsequent_sleep_figure(
             )
     frame = pd.DataFrame(rows)
     panels = (
-        ("steps", "sleep_hours", "Daily steps", "Following sleep duration", "#087CFF"),
-        ("steps", "sleep_score", "Daily steps", "Following Garmin Sleep score", "#087CFF"),
-        ("steps", "overnight_hrv", "Daily steps", "Following overnight HRV", "#087CFF"),
-        ("steps", "sleep_stress", "Daily steps", "Following average sleep stress", "#087CFF"),
-        ("floors", "sleep_hours", "Floors climbed", "Following sleep duration", "#E8793F"),
-        ("floors", "sleep_score", "Floors climbed", "Following Garmin Sleep score", "#E8793F"),
-        ("floors", "overnight_hrv", "Floors climbed", "Following overnight HRV", "#E8793F"),
-        ("floors", "sleep_stress", "Floors climbed", "Following average sleep stress", "#E8793F"),
+        ("steps", "sleep_hours", "Daily steps", "Following sleep duration", DURATION_COLOR),
+        ("steps", "sleep_score", "Daily steps", "Following Garmin Sleep score", SCORE_COLOR),
+        ("steps", "overnight_hrv", "Daily steps", "Following overnight HRV", HRV_COLOR),
+        ("steps", "sleep_stress", "Daily steps", "Following average sleep stress", STRESS_COLOR),
+        ("floors", "sleep_hours", "Floors climbed", "Following sleep duration", DURATION_COLOR),
+        ("floors", "sleep_score", "Floors climbed", "Following Garmin Sleep score", SCORE_COLOR),
+        ("floors", "overnight_hrv", "Floors climbed", "Following overnight HRV", HRV_COLOR),
+        ("floors", "sleep_stress", "Floors climbed", "Following average sleep stress", STRESS_COLOR),
     )
     figure = make_subplots(
         rows=2,

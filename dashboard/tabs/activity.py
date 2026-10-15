@@ -38,29 +38,6 @@ def render(view: ViewData) -> None:
             config={"displaylogo": False},
         )
     st.subheader("Activities vs the following night")
-    activity_predictor = st.radio(
-        "Activity predictor",
-        ["Activity duration", "Time from activity to sleep"],
-        horizontal=True,
-    )
-    st.plotly_chart(
-        activity_effect_on_sleep_figure(
-            view.selected.activities,
-            view.selected.sessions,
-            view.selected.garmin_metrics,
-            predictor=(
-                "gap"
-                if activity_predictor == "Time from activity to sleep"
-                else "duration"
-            ),
-        ),
-        width="stretch",
-        config={"displaylogo": False},
-    )
-    st.caption(
-        "Each activity day is paired with the first night sleep starting after that "
-        "day's final recorded activity. Lines show simple overall trends, not causation."
-    )
     st.plotly_chart(
         activity_type_comparison_figure(
             view.selected.activities, view.selected.sessions, view.selected.garmin_metrics
@@ -74,6 +51,22 @@ def render(view: ViewData) -> None:
         ),
         width="stretch",
         config={"displaylogo": False},
+    )
+    # Both predictors shown together: duration, then time from activity to sleep.
+    for predictor in ("duration", "gap"):
+        st.plotly_chart(
+            activity_effect_on_sleep_figure(
+                view.selected.activities,
+                view.selected.sessions,
+                view.selected.garmin_metrics,
+                predictor=predictor,
+            ),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    st.caption(
+        "Each activity day is paired with the first night sleep starting after that "
+        "day's final recorded activity. Lines show simple overall trends, not causation."
     )
     st.subheader("Daily load vs the following night")
     st.plotly_chart(
