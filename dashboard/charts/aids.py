@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 
 from dashboard.charts.common import (
     DATE_CHART_SIDE_MARGINS,
+    DATE_HOVER_FORMAT,
     NAP_BAR_COLOR,
     NIGHT_BAR_COLOR,
     SLEEP_SCORE_PINK,
@@ -21,6 +22,7 @@ from dashboard.charts.common import (
     _stacked_bar_top,
 )
 from dashboard.config import DATA_ROOT
+from dashboard.model import parse_hindrances
 
 
 AID_COLORS_PATH = DATA_ROOT / "aid_colors.json"
@@ -309,7 +311,7 @@ def aid_duration_timeline_figure(
                 x=subset["date_plot"],
                 y=subset["night_hours"],
                 marker=dict(color=_aid_color(aid), line=dict(width=0)),
-                hovertemplate=f"%{{x|%d/%m/%Y}}<br>{aid} · night: %{{y:.2f}} h<extra></extra>",
+                hovertemplate=f"{aid} · night: %{{y:.2f}} h<extra></extra>",
             )
         )
     figure.add_trace(
@@ -318,7 +320,7 @@ def aid_duration_timeline_figure(
             x=frame["date_plot"],
             y=frame["awake_hours"],
             marker=dict(color="#9CA3AF", line=dict(width=0)),
-            hovertemplate="%{x|%d/%m/%Y}<br>Awake / interruptions: %{y:.2f} h<extra></extra>",
+            hovertemplate="Awake / interruptions: %{y:.2f} h<extra></extra>",
         )
     )
     for aid in order:
@@ -332,7 +334,7 @@ def aid_duration_timeline_figure(
                 x=subset["date_plot"],
                 y=subset["nap_hours"],
                 marker=dict(color=_aid_nap_color(aid), line=dict(width=0)),
-                hovertemplate=f"%{{x|%d/%m/%Y}}<br>{aid} · nap: %{{y:.2f}} h<extra></extra>",
+                hovertemplate=f"{aid} · nap: %{{y:.2f}} h<extra></extra>",
             )
         )
     zero = frame[frame["zero_sleep"]]
@@ -344,7 +346,7 @@ def aid_duration_timeline_figure(
                 y=[0.08] * len(zero),
                 base=[0] * len(zero),
                 marker_color=ZERO_COLOR,
-                hovertemplate="<b>Zero sleep</b><br>%{x|%d/%m/%Y}<extra></extra>",
+                hovertemplate="<b>Zero sleep</b><br>%{x|%d.%m.%Y}<extra></extra>",
             )
         )
     _add_no_data_markers(figure, frame)
@@ -354,7 +356,7 @@ def aid_duration_timeline_figure(
     frame["sleep_score_100"] = frame["date"].map(daily_scores)
     figure.add_trace(
         go.Scatter(
-            name="Garmin Sleep score (0–100)",
+            name="Sleep score (0–100)",
             x=frame["date_plot"],
             y=frame["sleep_score_100"],
             yaxis="y2",
@@ -362,7 +364,7 @@ def aid_duration_timeline_figure(
             visible="legendonly",
             connectgaps=False,
             line=dict(color=SLEEP_SCORE_PINK, width=1),
-            hovertemplate="%{x|%d/%m/%Y}<br>Garmin Sleep score: %{y:.0f}/100<extra></extra>",
+            hovertemplate="Sleep score: %{y:.0f}/100<extra></extra>",
         )
     )
     figure.update_layout(
@@ -373,7 +375,7 @@ def aid_duration_timeline_figure(
         xaxis=dict(
             title="Sleep date (wake date)",
             type="date",
-            tickformat="%d/%m",
+            tickformat="%d.%m",
             tickangle=0,
         ),
         yaxis=dict(
@@ -381,7 +383,7 @@ def aid_duration_timeline_figure(
             range=[0, max(_stacked_bar_top(figure) * 1.05, 1.0)],
         ),
         yaxis2=dict(
-            title="Garmin Sleep score (0–100)",
+            title="Sleep score (0–100)",
             overlaying="y",
             side="right",
             range=[0, 100],
@@ -395,6 +397,7 @@ def aid_duration_timeline_figure(
         _pannable_date_view(
             figure, frame["date"].min(), frame["date"].max(), view_start, view_end
         )
+    figure.update_xaxes(hoverformat=DATE_HOVER_FORMAT)
     return figure
 
 
@@ -422,22 +425,140 @@ def aid_score_figure(sessions: pd.DataFrame) -> go.Figure:
                 fillcolor=fill_color,
                 customdata=subset[["sleep_date", "sleep_minutes"]],
                 hovertemplate=(
-                    "%{customdata[0]}<br>Garmin Sleep score: %{y}/100<br>"
+                    "%{customdata[0]}<br>Sleep score: %{y}/100<br>"
                     "Sleep: %{customdata[1]:.0f} min"
                     "<extra>%{fullData.name}</extra>"
                 ),
             )
         )
     figure.update_layout(
-        title="Garmin Sleep score by recorded sleep aid",
+        title="Sleep score by recorded sleep aid",
         showlegend=False,
         height=500,
         margin=dict(l=60, r=24, t=64, b=90),
         xaxis_title="Recorded aid",
         yaxis=dict(
-            title="Garmin Sleep score (0–100)",
+            title="Sleep score (0–100)",
             range=[-2.5, 102.5],
             dtick=10,
         ),
     )
     return figure
+
+
+HINDRANCE_COLORS = ["#E8793F", "#EE55C0", "#2FD6A3", "#E6B84F", "#087CFF", "#a855f7"]
+NO_HINDRANCE = "None"
+
+
+def _hindrance_nights(sessions: pd.DataFrame) -> pd.DataFrame:
+    """One row per (night, hindrance) for nights where hindrances were recorded.
+
+    Only Sleepmeter records hindrances, so Garmin-only nights are left out
+    rather than counted as having none. A night with several hindrances
+    appears once for each.
+    """
+    nights = sessions[
+        (sessions["session_type"] == "NIGHT_SLEEP")
+        & (~sessions["zero_duration"])
+        & sessions["source"].str.startswith("sleepmeter")
+    ].copy()
+    nights["hindrance"] = nights["hindrances"].map(
+        lambda raw: parse_hindrances(raw) or [NO_HINDRANCE]
+    )
+    nights = nights.explode("hindrance")
+    nights["sleep_hours"] = nights["sleep_minutes"] / 60
+    nights["score_100"] = nights["legacy_garmin_score_10"] * 10
+    return nights
+
+
+def _hindrance_order(nights: pd.DataFrame) -> list[str]:
+    counts = nights["hindrance"].value_counts()
+    named = [name for name in counts.index if name != NO_HINDRANCE]
+    return ([NO_HINDRANCE] if NO_HINDRANCE in counts.index else []) + named
+
+
+def _hindrance_color(name: str, order: list[str]) -> str:
+    if name == NO_HINDRANCE:
+        return NIGHT_BAR_COLOR
+    named = [n for n in order if n != NO_HINDRANCE]
+    return HINDRANCE_COLORS[named.index(name) % len(HINDRANCE_COLORS)]
+
+
+def _no_hindrance_data(title: str) -> go.Figure:
+    figure = go.Figure()
+    figure.add_annotation(
+        text="No Sleepmeter nights with hindrance records in the selected date range",
+        showarrow=False,
+    )
+    figure.update_layout(title=title, height=420)
+    return figure
+
+
+def _hindrance_box_figure(
+    sessions: pd.DataFrame,
+    value: str,
+    title: str,
+    yaxis: dict,
+) -> go.Figure:
+    """One box per hindrance (plus "None"), styled like the aid box plots."""
+    nights = _hindrance_nights(sessions)
+    if nights.empty:
+        return _no_hindrance_data(title)
+    order = _hindrance_order(nights)
+    figure = go.Figure()
+    for name in order:
+        subset = nights[(nights["hindrance"] == name) & nights[value].notna()]
+        if subset.empty:
+            continue
+        color = _hindrance_color(name, order)
+        figure.add_trace(
+            go.Box(
+                name=name,
+                y=subset[value],
+                boxpoints="all",
+                jitter=0.28,
+                pointpos=0,
+                marker_color=color,
+                line_color=color,
+                fillcolor=_hex_with_alpha(color, 0.5),
+                customdata=subset[["sleep_date"]],
+                hovertemplate=(
+                    "%{customdata[0]}<br>%{y:.1f}"
+                    f"<extra>{name} · {subset['session_id'].nunique()} nights</extra>"
+                ),
+            )
+        )
+    figure.update_layout(
+        title=title,
+        showlegend=False,
+        height=500,
+        margin=dict(l=60, r=24, t=64, b=90),
+        xaxis_title="Recorded hindrance",
+        yaxis=yaxis,
+    )
+    return figure
+
+
+def _hex_with_alpha(color: str, alpha: float) -> str:
+    red, green, blue = (int(color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
+    return f"rgba({red}, {green}, {blue}, {alpha})"
+
+
+def hindrance_score_figure(sessions: pd.DataFrame) -> go.Figure:
+    """Sleep score on nights with each hindrance, vs none (Sleepmeter nights)."""
+    return _hindrance_box_figure(
+        sessions,
+        "score_100",
+        "Sleep score by recorded hindrance",
+        dict(title="Sleep score (0–100)", range=[-2.5, 102.5]),
+    )
+
+
+def hindrance_duration_figure(sessions: pd.DataFrame) -> go.Figure:
+    """Hours asleep on nights with each hindrance, vs none (Sleepmeter nights)."""
+    return _hindrance_box_figure(
+        sessions,
+        "sleep_hours",
+        "Sleep duration by recorded hindrance",
+        dict(title="Hours asleep"),
+    )

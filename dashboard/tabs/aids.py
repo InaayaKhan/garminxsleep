@@ -1,4 +1,4 @@
-"""Aids: per-aid comparisons, and editing the aid of Garmin nights."""
+"""Aids & hindrances: per-aid comparisons, aid editing, and sleep by hindrance."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from dashboard.charts import (
     aid_figure,
     aid_score_figure,
     aid_sleep_stage_composition_figure,
+    hindrance_duration_figure,
+    hindrance_score_figure,
 )
 from dashboard.data import cached_dataset, save_garmin_aid_override
 from dashboard.tabs import ViewData
@@ -16,7 +18,7 @@ from dashboard.tabs import ViewData
 
 def render(view: ViewData) -> None:
     st.markdown(
-        'How nights with each sleep aid compare. These are descriptive: aids were used in different periods, so differences can also reflect the season or other changes.'
+        'How nights with each sleep aid or hindrance compare. These are descriptive: aids were used in different periods, so differences can also reflect the season or other changes.'
     )
     garmin_aid_sessions = view.selected.sessions[
         (view.selected.sessions["source"] == "garmin")
@@ -30,7 +32,7 @@ def render(view: ViewData) -> None:
             selected_aid_date = st.selectbox(
                 "Garmin sleep date",
                 session_dates,
-                format_func=lambda value: value.isoformat(),
+                format_func=lambda value: value.strftime("%d.%m.%Y"),
             )
             selected_aid_session = garmin_aid_sessions[
                 garmin_aid_sessions["sleep_date"] == selected_aid_date
@@ -127,6 +129,26 @@ def render(view: ViewData) -> None:
         config={"displaylogo": False},
     )
     st.caption(
-        "Garmin Sleep scores are shown for night sleep only. Point colors indicate "
+        "Sleep scores are shown for night sleep only. Point colors indicate "
         "the recorded sleep aid. Aid comparisons are descriptive, not causal."
+    )
+    st.subheader("Hindrances")
+    hindrance_score_column, hindrance_duration_column = st.columns(2)
+    with hindrance_score_column:
+        st.plotly_chart(
+            hindrance_score_figure(view.selected.sessions),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    with hindrance_duration_column:
+        st.plotly_chart(
+            hindrance_duration_figure(view.selected.sessions),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+    st.caption(
+        "Hindrances come from Sleepmeter, so only Sleepmeter-recorded nights are "
+        "included; Garmin doesn't record them. A night with several hindrances "
+        "counts toward each. Comparisons are descriptive: a few nights with a "
+        "hindrance can differ by chance."
     )

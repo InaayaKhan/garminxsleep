@@ -79,6 +79,23 @@ def _merged_holes(raw: str, duration_minutes: float) -> list[tuple[float, float]
     return merged
 
 
+def parse_hindrances(raw: object) -> list[str]:
+    """Readable hindrance names from a Sleepmeter ``hindrances`` field.
+
+    Sleepmeter stores IDs such as ``NONE`` or ``BATHROOM_TRIP``; ``NONE`` and
+    empty values mean nothing was recorded. Several IDs separated by ``|``,
+    ``,`` or ``;`` are all returned.
+    """
+    if not isinstance(raw, str):
+        return []
+    names = []
+    for token in re.split(r"[|,;]", raw):
+        token = token.strip()
+        if token and token.upper() != "NONE":
+            names.append(token.replace("_", " ").capitalize())
+    return names
+
+
 def _asleep_ranges(
     sleep_start: datetime, wake_time: datetime, holes: list[tuple[float, float]]
 ) -> list[tuple[datetime, datetime]]:

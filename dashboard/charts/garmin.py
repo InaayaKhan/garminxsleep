@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from dashboard.charts.common import DATE_HOVER_FORMAT
 from dashboard.config import TIMEZONE_NAME
 
 
@@ -91,7 +92,7 @@ def sleep_score_components_figure(metrics: pd.DataFrame) -> go.Figure:
                 ticktext=["Poor", "Fair", "Good", "Excellent"],
             ),
             hovertemplate=(
-                "%{x|%d/%m/%Y}<br><b>%{y}</b><br>%{text}<extra></extra>"
+                "%{x|%d.%m.%Y}<br><b>%{y}</b><br>%{text}<extra></extra>"
             ),
             xgap=1,
             ygap=1,
@@ -101,7 +102,7 @@ def sleep_score_components_figure(metrics: pd.DataFrame) -> go.Figure:
         title="Garmin Sleep score components",
         height=470,
         margin=dict(l=125, r=80, t=70, b=60),
-        xaxis=dict(title="Sleep date", tickformat="%d/%m", showgrid=False),
+        xaxis=dict(title="Sleep date", tickformat="%d.%m", showgrid=False),
         yaxis=dict(autorange="reversed", showgrid=False),
     )
     return figure
@@ -158,20 +159,21 @@ def overnight_recovery_figure(metrics: pd.DataFrame) -> go.Figure:
                     line=dict(color=color, width=1.4),
                     showlegend=False,
                     hovertemplate=(
-                        f"%{{x|%d/%m/%Y}}<br>{title}: %{{y:.1f}} {unit}<extra></extra>"
+                        f"{title}: %{{y:.1f}} {unit}<extra></extra>"
                     ),
                 ),
                 row=row,
                 col=col,
             )
             figure.update_yaxes(title_text=unit, showgrid=True, row=row, col=col)
-    figure.update_xaxes(tickformat="%d/%m", showgrid=False)
+    figure.update_xaxes(tickformat="%d.%m", showgrid=False)
     figure.update_layout(
         title="Overnight recovery panel",
         height=760,
         margin=dict(l=72, r=32, t=90, b=55),
         hovermode="x unified",
     )
+    figure.update_xaxes(hoverformat=DATE_HOVER_FORMAT)
     return figure
 
 
@@ -223,20 +225,21 @@ def daily_physiological_load_figure(metrics: pd.DataFrame) -> go.Figure:
                     line=dict(color=color, width=1.4),
                     showlegend=False,
                     hovertemplate=(
-                        f"%{{x|%d/%m/%Y}}<br>{title}: %{{y:.1f}} {unit}<extra></extra>"
+                        f"{title}: %{{y:.1f}} {unit}<extra></extra>"
                     ),
                 ),
                 row=row,
                 col=col,
             )
             figure.update_yaxes(title_text=unit, rangemode="tozero", row=row, col=col)
-    figure.update_xaxes(tickformat="%d/%m", showgrid=False)
+    figure.update_xaxes(tickformat="%d.%m", showgrid=False)
     figure.update_layout(
         title="Daily physiological load",
         height=760,
         margin=dict(l=72, r=32, t=90, b=55),
         hovermode="x unified",
     )
+    figure.update_xaxes(hoverformat=DATE_HOVER_FORMAT)
     return figure
 
 
@@ -292,7 +295,7 @@ def awakenings_efficiency_figure(metrics: pd.DataFrame) -> go.Figure:
                     line=dict(color=color, width=1.4),
                     showlegend=False,
                     hovertemplate=(
-                        f"%{{x|%d/%m/%Y}}<br>{title}: %{{y:.1f}} {unit}<extra></extra>"
+                        f"{title}: %{{y:.1f}} {unit}<extra></extra>"
                     ),
                 ),
                 row=row,
@@ -311,13 +314,14 @@ def awakenings_efficiency_figure(metrics: pd.DataFrame) -> go.Figure:
                 figure.update_yaxes(title_text=unit, range=[0, 100], row=row, col=col)
             else:
                 figure.update_yaxes(title_text=unit, rangemode="tozero", row=row, col=col)
-    figure.update_xaxes(tickformat="%d/%m", showgrid=False)
+    figure.update_xaxes(tickformat="%d.%m", showgrid=False)
     figure.update_layout(
         title="Awakenings and sleep efficiency",
         height=610,
         margin=dict(l=74, r=32, t=90, b=55),
         hovermode="x unified",
     )
+    figure.update_xaxes(hoverformat=DATE_HOVER_FORMAT)
     return figure
 
 
@@ -352,14 +356,18 @@ def intraday_recovery_timeline_figure(
     for night in sessions[(sessions["wake_time"] > day_start) & (sessions["sleep_start"] < day_end)].itertuples(index=False):
         figure.add_vrect(x0=max(night.sleep_start, day_start.to_pydatetime()), x1=min(night.wake_time, day_end.to_pydatetime()), fillcolor="#5B32D6", opacity=0.12, line_width=0)
     figure.update_layout(
-        title=f"Intraday recovery · {selected_date:%d/%m/%Y}",
+        title=f"Intraday recovery · {selected_date:%d.%m.%Y}",
         height=500,
         yaxis=dict(title="Value", rangemode="tozero"),
         xaxis=dict(title="Time", tickformat="%H:%M", range=[day_start, day_end]),
         legend=dict(orientation="h", y=1.02),
         hovermode="x unified",
     )
+    figure.update_xaxes(hoverformat=DATE_HOVER_FORMAT)
     return figure
+
+
+HEART_RATE_BIN_MINUTES = 10
 
 
 def heart_rate_24_hour_heatmap(
@@ -374,13 +382,15 @@ def heart_rate_24_hour_heatmap(
         frame["minute_of_day"] = (
             frame["timestamp"].dt.hour * 60 + frame["timestamp"].dt.minute
         )
-        frame["minute_bin"] = (frame["minute_of_day"] // 2) * 2
+        # 10-minute cells: finer detail isn't visible at this chart height but
+        # multiplies the data sent to the browser.
+        frame["minute_bin"] = (frame["minute_of_day"] // HEART_RATE_BIN_MINUTES) * HEART_RATE_BIN_MINUTES
         matrix = frame.pivot_table(
             index="minute_bin",
             columns="date",
             values="heart_rate",
             aggfunc="mean",
-        ).reindex(index=range(0, 1440, 2))
+        ).reindex(index=range(0, 1440, HEART_RATE_BIN_MINUTES)).round()
         all_dates = pd.date_range(start_date, end_date, freq="D")
         matrix = matrix.reindex(columns=[value.date() for value in all_dates])
         observed = frame["heart_rate"].dropna()
@@ -389,7 +399,7 @@ def heart_rate_24_hour_heatmap(
         figure.add_trace(
             go.Heatmap(
                 x=all_dates,
-                y=matrix.index / 60,
+                y=(matrix.index + HEART_RATE_BIN_MINUTES / 2) / 60,
                 z=matrix.to_numpy(),
                 zmin=color_min,
                 zmax=color_max,
@@ -403,7 +413,7 @@ def heart_rate_24_hour_heatmap(
                 ],
                 colorbar=dict(title="bpm", thickness=14),
                 hovertemplate=(
-                    "%{x|%d/%m/%Y}<br>%{y:.2f} hours<br>"
+                    "%{x|%d.%m.%Y}<br>%{y:.2f} hours<br>"
                     "Heart rate: %{z:.0f} bpm<extra></extra>"
                 ),
                 xgap=0.2,
@@ -437,7 +447,7 @@ def heart_rate_24_hour_heatmap(
                     ],
                     hovertemplate=(
                         "%{customdata[0]}<br>"
-                        "%{customdata[1]|%d/%m %H:%M}–"
+                        "%{customdata[1]|%d.%m %H:%M}–"
                         "%{customdata[2]|%H:%M}<extra></extra>"
                     ),
                 )
@@ -500,7 +510,7 @@ def daily_calories_stacked_figure(metrics: pd.DataFrame) -> go.Figure:
                 x=frame["date"],
                 y=frame["resting_calories"],
                 marker=dict(color="#5B32D6", line_width=0),
-                hovertemplate="%{x|%d/%m/%Y}<br>Resting: %{y:.0f} kcal<extra></extra>",
+                hovertemplate="Resting: %{y:.0f} kcal<extra></extra>",
             )
         )
         figure.add_trace(
@@ -509,7 +519,7 @@ def daily_calories_stacked_figure(metrics: pd.DataFrame) -> go.Figure:
                 x=frame["date"],
                 y=frame["active_calories"],
                 marker=dict(color="#FF7AB6", line_width=0),
-                hovertemplate="%{x|%d/%m/%Y}<br>Active: %{y:.0f} kcal<extra></extra>",
+                hovertemplate="Active: %{y:.0f} kcal<extra></extra>",
             )
         )
     figure.update_layout(
@@ -523,4 +533,5 @@ def daily_calories_stacked_figure(metrics: pd.DataFrame) -> go.Figure:
         legend=dict(orientation="h", y=1.02),
         hovermode="x unified",
     )
+    figure.update_xaxes(hoverformat=DATE_HOVER_FORMAT)
     return figure

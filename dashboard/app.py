@@ -109,6 +109,8 @@ with range_column:
         max_value=coverage[1],
         on_change=_mark_custom,
         label_visibility="hidden",
+        # Day first, matching the charts' date axes.
+        format="DD.MM.YYYY",
     )
 selected_range = st.session_state.date_range
 if isinstance(selected_range, tuple) and len(selected_range) == 2:
@@ -138,7 +140,7 @@ overview_tab, patterns_tab, timing_tab, sleep_quality_tab, aids_tab, activity_ta
         "Patterns",
         "Timing",
         "Sleep quality",
-        "Aids",
+        "Aids & hindrances",
         "Activity & sleep",
         "Garmin",
         "Records",
@@ -172,6 +174,6 @@ with records_tab:
 st.sidebar.divider()
 st.sidebar.caption(f"Source: {export_path.name}")
 st.sidebar.caption(
-    f"Coverage: {dataset.coverage_start.isoformat()} to {dataset.coverage_end.isoformat()}"
+    f"Coverage: {dataset.coverage_start:%d.%m.%Y} to {dataset.coverage_end:%d.%m.%Y}"
 )
 st.sidebar.caption(f"Local database: {DATABASE_PATH.name}")

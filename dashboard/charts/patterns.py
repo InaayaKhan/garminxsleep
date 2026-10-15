@@ -189,7 +189,7 @@ def calendar_sleep_heatmap(daily: pd.DataFrame) -> go.Figure:
     week_lookup = {week: index for index, week in enumerate(weeks)}
     frame["week_number"] = frame["week_start"].map(week_lookup)
     frame["weekday"] = frame["weekday_number"].map(dict(enumerate(WEEKDAY_ORDER)))
-    frame["date_text"] = frame["timestamp"].dt.strftime("%Y-%m-%d")
+    frame["date_text"] = frame["timestamp"].dt.strftime("%d.%m.%Y")
 
     figure = go.Figure(
         go.Scatter(
@@ -226,7 +226,7 @@ def calendar_sleep_heatmap(daily: pd.DataFrame) -> go.Figure:
             title="Week starting",
             tickmode="array",
             tickvals=tick_positions,
-            ticktext=[pd.Timestamp(weeks[index]).strftime("%d/%m") for index in tick_positions],
+            ticktext=[pd.Timestamp(weeks[index]).strftime("%d.%m") for index in tick_positions],
             showgrid=False,
             zeroline=False,
         ),
@@ -262,7 +262,7 @@ def calendar_sleep_score_heatmap(
     week_lookup = {week: index for index, week in enumerate(weeks)}
     frame["week_number"] = frame["week_start"].map(week_lookup)
     frame["weekday"] = frame["weekday_number"].map(dict(enumerate(WEEKDAY_ORDER)))
-    frame["date_text"] = frame["timestamp"].dt.strftime("%Y-%m-%d")
+    frame["date_text"] = frame["timestamp"].dt.strftime("%d.%m.%Y")
     scored_frame = frame[frame["score"].notna()]
 
     figure = go.Figure(
@@ -301,7 +301,7 @@ def calendar_sleep_score_heatmap(
             title="Week starting",
             tickmode="array",
             tickvals=tick_positions,
-            ticktext=[pd.Timestamp(weeks[index]).strftime("%d/%m") for index in tick_positions],
+            ticktext=[pd.Timestamp(weeks[index]).strftime("%d.%m") for index in tick_positions],
             showgrid=False,
             zeroline=False,
         ),

@@ -424,7 +424,7 @@ def sleep_efficiency_figure(sessions: pd.DataFrame) -> go.Figure:
                 line=dict(color=NIGHT_BAR_COLOR, width=1.8),
                 customdata=frame[["interruption_minutes"]],
                 hovertemplate=(
-                    "%{x|%Y-%m-%d}<br>Efficiency: %{y:.1f}%<br>"
+                    "%{x|%d.%m.%Y}<br>Efficiency: %{y:.1f}%<br>"
                     "Awake in holes: %{customdata[0]:.0f} min<extra></extra>"
                 ),
                 showlegend=False,
@@ -434,7 +434,7 @@ def sleep_efficiency_figure(sessions: pd.DataFrame) -> go.Figure:
         title="Nightly sleep efficiency",
         height=500,
         margin=dict(l=70, r=24, t=64, b=64),
-        xaxis=dict(title="Sleep date", tickformat="%d/%m"),
+        xaxis=dict(title="Sleep date", tickformat="%d.%m"),
         yaxis=dict(title="Sleep efficiency", range=[0, 100], ticksuffix="%"),
     )
     return figure

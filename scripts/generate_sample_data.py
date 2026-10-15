@@ -42,6 +42,9 @@ AIDS = {
     "CUSTOM_1002": "Magnesium",
     "CUSTOM_1003": "Chamomile tea",
 }
+# Sleepmeter-style hindrance IDs and how often each night gets one. Drawn from
+# a separate random generator so adding them doesn't reshuffle the other data.
+HINDRANCES = {"NOISE": 0.06, "TEMPERATURE": 0.05, "BATHROOM_TRIP": 0.04, "LIGHT": 0.03}
 AID_SCHEDULE = [  # (first day, aid id)
     (date(2026, 3, 2), "NONE"),
     (date(2026, 3, 10), "CUSTOM_1003"),
@@ -71,6 +74,7 @@ class Night:
     holes: list[tuple[int, int]]  # minute offsets from sleep_start
     aid_id: str
     zero: bool = False
+    hindrance: str = "NONE"  # Sleepmeter hindrance ID
 
     @property
     def gross_minutes(self) -> int:
@@ -145,6 +149,7 @@ def cycle_info(day: date) -> tuple[int, date, int]:
 def simulate(rng: random.Random) -> tuple[list[Night], list[Nap], list[Activity]]:
     nights, naps, activities = [], [], []
     activity_id = 18_000_000_001
+    hindrance_rng = random.Random(SEED + 1)
     for day in days(FIRST_DAY, LAST_DAY):
         weekend = (day - timedelta(days=1)).weekday() >= 5  # Fri/Sat nights
         aid_id = aid_for(day)
@@ -155,6 +160,14 @@ def simulate(rng: random.Random) -> tuple[list[Night], list[Nap], list[Activity]
             asleep_hour = 23.4 + (1.0 if weekend else 0.0) + rng.gauss(0, 0.6)
             hours = 7.1 + (0.7 if weekend else 0.0) + rng.gauss(0, 0.9)
             hours += 0.35 if aid_id != "NONE" else 0.0
+            draw, hindrance = hindrance_rng.random(), "NONE"
+            for candidate, share in HINDRANCES.items():
+                if draw < share:
+                    hindrance = candidate
+                    break
+                draw -= share
+            if hindrance != "NONE":
+                hours -= hindrance_rng.uniform(0.3, 0.9)  # a disturbed night is shorter
             hours = min(max(hours, 3.5), 10.5)
             start = local(day - timedelta(days=1), asleep_hour)
             gross = round(hours * 60)
@@ -172,7 +185,7 @@ def simulate(rng: random.Random) -> tuple[list[Night], list[Nap], list[Activity]
             gross += sum(end - begin for begin, end in merged)
             wake = start + timedelta(minutes=gross)
             bedtime = start - timedelta(minutes=rng.randint(5, 25))
-            nights.append(Night(day, start, wake, bedtime, merged, aid_id))
+            nights.append(Night(day, start, wake, bedtime, merged, aid_id, hindrance=hindrance))
 
         if rng.random() < 0.12:
             naps.append(Nap(day, local(day, rng.uniform(13.5, 16.0)), rng.randint(20, 60)))
@@ -219,14 +232,15 @@ def write_sleepmeter(nights: list[Night], naps: list[Nap], rng: random.Random) -
                 "type": "NIGHT_SLEEP",
                 "dreams": "NONE",
                 "aid": night.aid_id,
-                "hindrances": "NONE",
+                "hindrances": night.hindrance,
                 "tags": "",
                 "quality": quality,
                 "notes": "",
             }
         )
     for nap in naps:
-        if nap.day > SLEEPMETER_EXPORT_DAY:
+        # The missing day has nothing logged at all, naps included.
+        if nap.day > SLEEPMETER_EXPORT_DAY or nap.day == MISSING_DAY:
             continue
         end = nap.start + timedelta(minutes=nap.minutes)
         rows.append(

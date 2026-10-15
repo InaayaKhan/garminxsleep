@@ -68,20 +68,29 @@ def _weekend_highlight_time_figure(
             y=mean,
             line=dict(color=weekday_color, width=1.5, dash="dash"),
         )
+    # Each day-to-day segment takes the colour of the day it leads to. Segments
+    # of one colour share a single trace, separated by gaps (None), which is far
+    # cheaper for the browser than one trace per segment.
+    segments = {weekday_color: ([], []), weekend_color: ([], [])}
     for index in range(len(frame) - 1):
         current = frame.iloc[index]
         following = frame.iloc[index + 1]
-        segment_color = weekend_color if following["is_weekend"] else weekday_color
-        figure.add_trace(
-            go.Scatter(
-                x=[current["timeline"], following["timeline"]],
-                y=[current["clock_value"], following["clock_value"]],
-                mode="lines",
-                line=dict(color=segment_color, width=1.8),
-                hoverinfo="skip",
-                showlegend=False,
+        xs, ys = segments[weekend_color if following["is_weekend"] else weekday_color]
+        xs += [current["timeline"], following["timeline"], None]
+        ys += [current["clock_value"], following["clock_value"], None]
+    for segment_color, (xs, ys) in segments.items():
+        if xs:
+            figure.add_trace(
+                go.Scatter(
+                    x=xs,
+                    y=ys,
+                    mode="lines",
+                    line=dict(color=segment_color, width=1.8),
+                    connectgaps=False,
+                    hoverinfo="skip",
+                    showlegend=False,
+                )
             )
-        )
     figure.add_trace(
         go.Scatter(
             name="Overall trend",
@@ -93,7 +102,7 @@ def _weekend_highlight_time_figure(
             showlegend=False,
         )
     )
-    xaxis: dict[str, object] = {"title": "Sleep date", "tickformat": "%d/%m"}
+    xaxis: dict[str, object] = {"title": "Sleep date", "tickformat": "%d.%m"}
     if not frame.empty:
         x_start, x_end = _date_axis_limits(frame["timeline"])
         xaxis.update(

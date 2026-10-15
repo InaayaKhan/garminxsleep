@@ -6,7 +6,7 @@ import json
 import os
 import sys
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -27,7 +27,12 @@ PROFILE_COLLECTORS = {
     "weekly": ("body", "training", "menstrual"),
     "backfill": COLLECTORS,
 }
-PROFILE_BUDGETS = {"daily": 30, "weekly": 20, "backfill": 100}
+PROFILE_BUDGETS = {"daily": 50, "weekly": 20, "backfill": 100}
+# Catching up after missed runs (see --catch-up): extra requests allowed per
+# missed day, and at most this many extra per run; the rest follows next run.
+CATCH_UP_REQUESTS_PER_DAY = 10
+CATCH_UP_EXTRA_REQUESTS = 90
+STATE_FILE = "sync_state.json"
 
 
 def _default_private_root() -> Path:
@@ -329,41 +334,59 @@ def _collect_menstrual(
     )
 
 
+def _run_collectors(
+    client: Any, runner: Collector, collectors: tuple[str, ...], start: date, end: date
+) -> None:
+    days = _dates(start, end)
+    for name in collectors:
+        if name == "sleep":
+            _collect_sleep(client, runner, days)
+        elif name == "hrv":
+            _collect_hrv(client, runner, days)
+        elif name == "daily_health":
+            _collect_daily_health(client, runner, start, end, days)
+        elif name == "body":
+            _collect_body(client, runner, start, end)
+        elif name == "activities":
+            _collect_activities(client, runner, start, end)
+        elif name == "training":
+            _collect_training(client, runner, days)
+        elif name == "menstrual":
+            _collect_menstrual(client, runner, start, end, days)
+
+
+def _read_state(private_root: Path) -> dict[str, Any]:
+    path = private_root / STATE_FILE
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) or {}
+    except (OSError, ValueError):
+        return {}
+
+
 def sync(
-    start: date,
-    end: date,
+    windows: list[tuple[date, date, bool]],
     private_root: Path,
     collectors: tuple[str, ...],
     max_requests: int,
     request_delay: float,
-    refresh_existing: bool,
     client_path: Path | None = None,
 ) -> int:
-    if start > end:
-        raise ValueError("Start date must not be after end date")
+    """Fetch each (start, end, refresh_existing) window in order, sharing one budget."""
+    for start, end, _ in windows:
+        if start > end:
+            raise ValueError("Start date must not be after end date")
 
     client = _login(private_root, client_path)
     raw_root = private_root / "raw"
-    runner = Collector(raw_root, max_requests, request_delay, refresh_existing)
-    days = _dates(start, end)
+    runner = Collector(raw_root, max_requests, request_delay, windows[0][2])
     stopped_reason: str | None = None
 
     try:
-        for name in collectors:
-            if name == "sleep":
-                _collect_sleep(client, runner, days)
-            elif name == "hrv":
-                _collect_hrv(client, runner, days)
-            elif name == "daily_health":
-                _collect_daily_health(client, runner, start, end, days)
-            elif name == "body":
-                _collect_body(client, runner, start, end)
-            elif name == "activities":
-                _collect_activities(client, runner, start, end)
-            elif name == "training":
-                _collect_training(client, runner, days)
-            elif name == "menstrual":
-                _collect_menstrual(client, runner, start, end, days)
+        for start, end, refresh_existing in windows:
+            runner.refresh_existing = refresh_existing
+            _run_collectors(client, runner, collectors, start, end)
     except RequestBudgetReached:
         stopped_reason = "request_budget_reached"
         print("Request budget reached; stopping before another Garmin request.")
@@ -372,19 +395,37 @@ def sync(
         print("Garmin returned a rate limit. Stopping immediately; do not retry now.")
 
     manifest = {
-        "requested_start": start.isoformat(),
-        "requested_end": end.isoformat(),
+        "requested_start": min(start for start, _, _ in windows).isoformat(),
+        "requested_end": max(end for _, end, _ in windows).isoformat(),
+        "windows": [
+            {"start": start.isoformat(), "end": end.isoformat(), "refresh_existing": refresh}
+            for start, end, refresh in windows
+        ],
         "collectors": list(collectors),
         "max_requests": max_requests,
         "requests_used": runner.requests_used,
         "request_delay_seconds": request_delay,
-        "refresh_existing": refresh_existing,
         "saved_files": runner.saved_files,
         "skipped_files": runner.skipped_files,
         "failures": runner.failures,
         "stopped_reason": stopped_reason,
     }
     _write_json(private_root / "last_sync.json", manifest)
+    if stopped_reason is None:
+        # Every window finished, so everything up to the latest end is fetched.
+        # A run cut short doesn't advance this; the next catch-up resumes there.
+        state = _read_state(private_root)
+        synced_through = max(end for _, end, _ in windows)
+        previous = state.get("synced_through")
+        if previous and date.fromisoformat(previous) > synced_through:
+            synced_through = date.fromisoformat(previous)
+        _write_json(
+            private_root / STATE_FILE,
+            {
+                "synced_through": synced_through.isoformat(),
+                "last_complete_sync_at": datetime.now().isoformat(timespec="seconds"),
+            },
+        )
     print(
         f"Saved {len(runner.saved_files)} response file(s) under {raw_root}; "
         f"used {runner.requests_used}/{max_requests} requests."
@@ -434,6 +475,27 @@ def _arguments() -> argparse.Namespace:
         help="Replace cached responses. Daily/weekly default on; backfill default off.",
     )
     parser.add_argument(
+        "--catch-up",
+        action="store_true",
+        help=(
+            "Also fetch days missed since the last complete sync (computer off, "
+            "travel), skipping files already saved. Gaps longer than "
+            "--catch-up-max-days are left for a manual backfill."
+        ),
+    )
+    parser.add_argument(
+        "--catch-up-max-days",
+        type=int,
+        default=60,
+        help="Furthest back --catch-up reaches (default: 60 days).",
+    )
+    parser.add_argument(
+        "--skip-if-synced-within",
+        type=float,
+        metavar="HOURS",
+        help="Exit without contacting Garmin if the last complete sync was this recent.",
+    )
+    parser.add_argument(
         "--private-root",
         type=Path,
         default=_default_private_root(),
@@ -469,14 +531,43 @@ def main() -> int:
         if arguments.client_path is not None
         else None
     )
+    private_root = arguments.private_root.expanduser().resolve()
+    state = _read_state(private_root)
+
+    if arguments.skip_if_synced_within is not None and state.get("last_complete_sync_at"):
+        last = datetime.fromisoformat(state["last_complete_sync_at"])
+        hours = (datetime.now() - last).total_seconds() / 3600
+        if hours < arguments.skip_if_synced_within:
+            print(f"Last complete sync was {hours:.1f} h ago; nothing to do.")
+            return 0
+
+    windows = [(start, end, refresh_existing)]
+    if arguments.catch_up and arguments.start is None and state.get("synced_through"):
+        gap_start = date.fromisoformat(state["synced_through"]) + timedelta(days=1)
+        earliest = start - timedelta(days=arguments.catch_up_max_days)
+        if gap_start < earliest:
+            print(
+                f"Missed days before {earliest.isoformat()} are beyond --catch-up-max-days; "
+                "fetch them with --profile backfill --start YYYY-MM-DD."
+            )
+            gap_start = earliest
+        if gap_start < start:
+            gap_days = (start - gap_start).days
+            # Recent days first (refreshed as usual), then the missed days, where
+            # files already saved by an interrupted catch-up are skipped.
+            windows.append((gap_start, start - timedelta(days=1), False))
+            print(f"Catching up {gap_days} missed day(s) from {gap_start.isoformat()}.")
+            if arguments.max_requests is None:
+                max_requests += min(
+                    CATCH_UP_REQUESTS_PER_DAY * gap_days, CATCH_UP_EXTRA_REQUESTS
+                )
+
     return sync(
-        start,
-        end,
-        arguments.private_root.expanduser().resolve(),
+        windows,
+        private_root,
         collectors,
         max_requests,
         arguments.request_delay,
-        refresh_existing,
         client_path,
     )
 

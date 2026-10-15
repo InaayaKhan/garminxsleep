@@ -36,6 +36,8 @@ from dashboard.charts.aids import (
     aid_figure,
     aid_score_figure,
     aid_sleep_stage_composition_figure,
+    hindrance_duration_figure,
+    hindrance_score_figure,
 )
 from dashboard.charts.activity import (
     activity_effect_on_sleep_figure,
@@ -89,6 +91,8 @@ __all__ = [
     "daily_duration_histogram",
     "daily_physiological_load_figure",
     "heart_rate_24_hour_heatmap",
+    "hindrance_duration_figure",
+    "hindrance_score_figure",
     "hour_px",
     "hourly_sleep_punch_card",
     "intensity_minutes_vs_subsequent_sleep_figure",
@@ -110,3 +114,25 @@ __all__ = [
     "steps_floors_vs_subsequent_sleep_figure",
     "wake_up_time_weekend_highlight_figure",
 ]
+
+
+def _cache_figures() -> None:
+    """Reuse built figures across Streamlit reruns.
+
+    Every interaction reruns the whole page, which would rebuild every chart on
+    every tab. Cached by their arguments (data, date range, options), a chart is
+    only rebuilt when something it depends on changes. Streamlit returns a copy,
+    so callers can still adjust the figure they get.
+    """
+    import streamlit as st
+
+    namespace = globals()
+    for name in __all__:
+        function = namespace[name]
+        if callable(function) and name.endswith(
+            ("_figure", "_heatmap", "_histogram", "_boxplot", "_card")
+        ):
+            namespace[name] = st.cache_data(show_spinner=False, max_entries=16)(function)
+
+
+_cache_figures()

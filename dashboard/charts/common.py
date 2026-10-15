@@ -11,6 +11,8 @@ import plotly.graph_objects as go
 from dashboard.config import SLEEP_TARGET_HOURS
 
 
+# How dates appear in hover labels (day.month.year).
+DATE_HOVER_FORMAT = "%d.%m.%Y"
 NIGHT_BAR_COLOR = "#5B32D6"
 
 
@@ -99,7 +101,7 @@ def _add_no_data_markers(figure: go.Figure, frame: pd.DataFrame) -> None:
             base=[0] * len(no_data),
             marker=dict(color=NO_DATA_COLOR, line=dict(width=0)),
             hovertemplate=(
-                "<b>No data</b><br>%{x|%d/%m/%Y}<br>"
+                "<b>No data</b><br>%{x|%d.%m.%Y}<br>"
                 "No Garmin or Sleepmeter record<extra></extra>"
             ),
         )

@@ -19,10 +19,12 @@ import pytest
 from dashboard.charts import (
     aid_sleep_stage_composition_figure,
     daily_duration_figure,
+    hindrance_duration_figure,
+    hindrance_score_figure,
     hour_px,
     sleep_stage_schedule_figure,
 )
-from dashboard.model import load_combined_sleep_data
+from dashboard.model import load_combined_sleep_data, parse_hindrances
 
 SAMPLE = Path(__file__).resolve().parents[1] / "sample_data"
 SETTINGS = json.loads((SAMPLE / "settings.json").read_text(encoding="utf-8"))
@@ -171,3 +173,35 @@ def test_hidden_hrv_lines_still_get_a_real_axis(dataset):
     low, high = stages.layout.yaxis2.range
     top_hrv = dataset.garmin_metrics["hrv_last_night_average"].max()
     assert low == 0 and high >= top_hrv
+
+
+def test_hindrance_ids_become_readable_names():
+    assert parse_hindrances("NONE") == []
+    assert parse_hindrances("") == []
+    assert parse_hindrances(float("nan")) == []
+    assert parse_hindrances("BATHROOM_TRIP") == ["Bathroom trip"]
+    assert parse_hindrances("NOISE|LIGHT") == ["Noise", "Light"]
+
+
+def test_hindrance_charts_use_only_sleepmeter_nights(dataset):
+    sessions = dataset.sessions
+    sleepmeter_nights = sessions[
+        (sessions["session_type"] == "NIGHT_SLEEP")
+        & (~sessions["zero_duration"])
+        & sessions["source"].str.startswith("sleepmeter")
+    ]
+    expected = {
+        name
+        for raw in sleepmeter_nights["hindrances"]
+        for name in parse_hindrances(raw)
+    }
+    assert expected, "sample data should contain hindrances"
+    for figure in (hindrance_score_figure(sessions), hindrance_duration_figure(sessions)):
+        assert {trace.name for trace in figure.data} - {"None"} == expected
+    # Garmin-only nights carry no hindrance record and must not count as "None".
+    duration = hindrance_duration_figure(sessions)
+    none_box = next(trace for trace in duration.data if trace.name == "None")
+    none_nights = sum(not parse_hindrances(raw) for raw in sleepmeter_nights["hindrances"])
+    # Count points via customdata (one date per night): cached figures store
+    # numeric arrays like y in Plotly's compact binary form.
+    assert len(none_box.customdata) == none_nights

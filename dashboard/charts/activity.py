@@ -462,8 +462,8 @@ def activity_to_sleep_gap_figure(
                         ["activity_name", "activity_end", "sleep_start"]
                     ],
                     hovertemplate=(
-                        "%{customdata[0]}<br>Ended: %{customdata[1]|%d/%m %H:%M}"
-                        "<br>Sleep began: %{customdata[2]|%d/%m %H:%M}"
+                        "%{customdata[0]}<br>Ended: %{customdata[1]|%d.%m %H:%M}"
+                        "<br>Sleep began: %{customdata[2]|%d.%m %H:%M}"
                         "<br>Gap: %{y:.1f} hours<extra></extra>"
                     ),
                 )
@@ -799,7 +799,7 @@ def calendar_activity_heatmap(
         activity_days["weekday"] = activity_days["weekday_number"].map(
             dict(enumerate(WEEKDAY_ORDER))
         )
-        activity_days["date_text"] = activity_days["timestamp"].dt.strftime("%Y-%m-%d")
+        activity_days["date_text"] = activity_days["timestamp"].dt.strftime("%d.%m.%Y")
 
     figure = go.Figure()
     if not activity_days.empty:
@@ -841,7 +841,7 @@ def calendar_activity_heatmap(
             title="Week starting",
             tickmode="array",
             tickvals=tick_positions,
-            ticktext=[pd.Timestamp(weeks[index]).strftime("%d/%m") for index in tick_positions],
+            ticktext=[pd.Timestamp(weeks[index]).strftime("%d.%m") for index in tick_positions],
             showgrid=False,
             zeroline=False,
         ),
@@ -882,7 +882,7 @@ def calendar_intensity_minutes_heatmap(
     week_lookup = {week: index for index, week in enumerate(weeks)}
     frame["week_number"] = frame["week_start"].map(week_lookup)
     frame["weekday"] = frame["weekday_number"].map(dict(enumerate(WEEKDAY_ORDER)))
-    frame["date_text"] = frame["timestamp"].dt.strftime("%Y-%m-%d")
+    frame["date_text"] = frame["timestamp"].dt.strftime("%d.%m.%Y")
 
     figure = go.Figure()
     if not frame.empty:
@@ -923,7 +923,7 @@ def calendar_intensity_minutes_heatmap(
             tickmode="array",
             tickvals=tick_positions,
             ticktext=[
-                pd.Timestamp(weeks[index]).strftime("%d/%m")
+                pd.Timestamp(weeks[index]).strftime("%d.%m")
                 for index in tick_positions
             ],
             showgrid=False,

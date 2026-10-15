@@ -18,6 +18,8 @@ dependencies = [
 dev = ["pytest>=8.3"]
 # Tested with 0.3.17; 0.x minor releases may change the API, so stay on 0.3.
 sync = ["garminconnect>=0.3.17,<0.4"]
+# Desktop window for the dashboard (python -m dashboard.desktop).
+app = ["pywebview>=5"]
 
 [tool.setuptools.packages.find]
 include = ["dashboard*"]

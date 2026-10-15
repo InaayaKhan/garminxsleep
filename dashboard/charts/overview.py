@@ -13,6 +13,7 @@ from dashboard.charts.common import (
     AVERAGE_7_COLOR,
     DATE_CHART_RIGHT_LEGEND,
     DATE_CHART_SIDE_MARGINS,
+    DATE_HOVER_FORMAT,
     NAP_BAR_COLOR,
     NIGHT_BAR_COLOR,
     SLEEP_SCORE_PINK,
@@ -249,8 +250,8 @@ def sleep_stage_schedule_figure(
                 continue
             customdata = [
                 [
-                    row.interval_start.strftime("%d/%m/%Y %H:%M"),
-                    row.interval_end.strftime("%d/%m/%Y %H:%M"),
+                    row.interval_start.strftime("%d.%m.%Y %H:%M"),
+                    row.interval_end.strftime("%d.%m.%Y %H:%M"),
                 ]
                 for row in stage_rows.itertuples(index=False)
             ]
@@ -329,8 +330,8 @@ def sleep_stage_schedule_figure(
                     ),
                     customdata=[
                         [
-                            row.session_start.strftime("%d/%m/%Y %H:%M"),
-                            row.session_wake.strftime("%d/%m/%Y %H:%M"),
+                            row.session_start.strftime("%d.%m.%Y %H:%M"),
+                            row.session_wake.strftime("%d.%m.%Y %H:%M"),
                         ]
                         for row in unavailable_rows.itertuples(index=False)
                     ],
@@ -400,8 +401,8 @@ def sleep_stage_schedule_figure(
                     [
                         row.activity_name,
                         row.activity_type.replace("_", " ").title(),
-                        row.activity_start.strftime("%d/%m/%Y %H:%M"),
-                        row.activity_end.strftime("%d/%m/%Y %H:%M"),
+                        row.activity_start.strftime("%d.%m.%Y %H:%M"),
+                        row.activity_end.strftime("%d.%m.%Y %H:%M"),
                     ]
                     for row in activity_frame.itertuples(index=False)
                 ],
@@ -436,7 +437,7 @@ def sleep_stage_schedule_figure(
                 connectgaps=False,
                 line=dict(color=HRV_GREEN, width=1),
                 hovertemplate=(
-                    "%{x|%d/%m/%Y}<br>Nightly average HRV: %{y:.0f} ms<extra></extra>"
+                    "%{x|%d.%m.%Y}<br>Nightly average HRV: %{y:.0f} ms<extra></extra>"
                 ),
             )
         )
@@ -451,7 +452,7 @@ def sleep_stage_schedule_figure(
                 connectgaps=False,
                 line=dict(color=HRV_WEEKLY_GREEN, width=1, dash="dot"),
                 hovertemplate=(
-                    "%{x|%d/%m/%Y}<br>7-day average HRV: %{y:.0f} ms<extra></extra>"
+                    "%{x|%d.%m.%Y}<br>7-day average HRV: %{y:.0f} ms<extra></extra>"
                 ),
             )
         )
@@ -486,7 +487,7 @@ def sleep_stage_schedule_figure(
                 connectgaps=False,
                 line=dict(color=SLEEP_SCORE_PINK, width=1),
                 hovertemplate=(
-                    "%{x|%d/%m/%Y}<br>Garmin Sleep score: %{y:.0f}/100<extra></extra>"
+                    "%{x|%d.%m.%Y}<br>Garmin Sleep score: %{y:.0f}/100<extra></extra>"
                 ),
             )
         )
@@ -501,7 +502,7 @@ def sleep_stage_schedule_figure(
                 connectgaps=False,
                 line=dict(color=SLEEP_SCORE_PINK, width=1, dash="dot"),
                 hovertemplate=(
-                    "%{x|%d/%m/%Y}<br>7-day average Sleep score: %{y:.1f}/100<extra></extra>"
+                    "%{x|%d.%m.%Y}<br>7-day average Sleep score: %{y:.1f}/100<extra></extra>"
                 ),
             )
         )
@@ -545,7 +546,7 @@ def sleep_stage_schedule_figure(
                 y=[0.08] * len(zero_days),
                 base=[0] * len(zero_days),
                 marker_color=ZERO_COLOR,
-                hovertemplate="<b>Zero sleep</b><br>%{x|%d/%m/%Y}<extra></extra>",
+                hovertemplate="<b>Zero sleep</b><br>%{x|%d.%m.%Y}<extra></extra>",
             )
         )
 
@@ -576,7 +577,7 @@ def sleep_stage_schedule_figure(
             range=[chart_start, chart_end],
             minallowed=chart_start,
             maxallowed=chart_end,
-            tickformat="%d/%m",
+            tickformat="%d.%m",
             # Never rotate: rotated labels would need more bottom margin.
             tickangle=0,
             showgrid=False,
@@ -709,7 +710,7 @@ def sleep_composition_figure(
                 marker=dict(color=colors[stage_name], line=dict(width=0)),
                 customdata=frame[[column]],
                 hovertemplate=(
-                    f"%{{x|%d/%m/%Y}}<br>{stage_name}: %{{y:.1f}}%"
+                    f"{stage_name}: %{{y:.1f}}%"
                     " (%{customdata[0]:.0f} min)<extra></extra>"
                 ),
             )
@@ -721,7 +722,7 @@ def sleep_composition_figure(
         height=470,
         margin=dict(**DATE_CHART_SIDE_MARGINS, t=64, b=72),
         xaxis=dict(
-            title="Sleep date", type="date", tickformat="%d/%m", tickangle=0, showgrid=False
+            title="Sleep date", type="date", tickformat="%d.%m", tickangle=0, showgrid=False
         ),
         yaxis=dict(title="Share of sleep window", range=[0, 100], ticksuffix="%"),
         hovermode="x unified",
@@ -733,6 +734,7 @@ def sleep_composition_figure(
         view_start,
         view_end,
     )
+    figure.update_xaxes(hoverformat=DATE_HOVER_FORMAT)
     return figure
 
 
@@ -853,7 +855,7 @@ def daily_duration_figure(
                     y=frame[column],
                     marker=marker,
                     hovertemplate=(
-                        f"%{{x}}<br>{trace_name}: %{{y:.2f}} h<extra></extra>"
+                        f"{trace_name}: %{{y:.2f}} h<extra></extra>"
                     ),
                 )
             )
@@ -864,7 +866,7 @@ def daily_duration_figure(
                 x=frame["date_plot"],
                 y=frame["night_hours"],
                 marker_color=NIGHT_BAR_COLOR,
-                hovertemplate="%{x}<br>Night sleep: %{y:.2f} h<extra></extra>",
+                hovertemplate="Night sleep: %{y:.2f} h<extra></extra>",
             )
         )
     night_interruptions = sessions[
@@ -880,7 +882,7 @@ def daily_duration_figure(
             y=frame["awake_hours"],
             marker=dict(color="#9CA3AF", line=dict(width=0)),
             hovertemplate=(
-                "%{x}<br>Awake / interruptions: %{y:.2f} h<extra></extra>"
+                "Awake / interruptions: %{y:.2f} h<extra></extra>"
             ),
         )
     )
@@ -890,7 +892,7 @@ def daily_duration_figure(
             x=frame["date_plot"],
             y=frame["nap_hours"],
             marker_color=NAP_BAR_COLOR,
-            hovertemplate="%{x}<br>Naps: %{y:.2f} h<extra></extra>",
+            hovertemplate="Naps: %{y:.2f} h<extra></extra>",
         )
     )
     if activities is not None and not activities.empty:
@@ -908,7 +910,7 @@ def daily_duration_figure(
                 opacity=0.72,
                 marker=dict(color="#4DB88A", line=dict(width=0)),
                 hovertemplate=(
-                    "%{x}<br>Garmin activity: %{y:.2f} h<extra></extra>"
+                    "Garmin activity: %{y:.2f} h<extra></extra>"
                 ),
             )
         )
@@ -922,7 +924,7 @@ def daily_duration_figure(
             visible="legendonly",
             connectgaps=False,
             line=dict(color=HRV_GREEN, width=1),
-            hovertemplate="%{x}<br>Nightly average HRV: %{y:.0f} ms<extra></extra>",
+            hovertemplate="Nightly average HRV: %{y:.0f} ms<extra></extra>",
         )
     )
     figure.add_trace(
@@ -934,7 +936,7 @@ def daily_duration_figure(
             mode="lines",
             connectgaps=False,
             line=dict(color=HRV_WEEKLY_GREEN, width=1, dash="dot"),
-            hovertemplate="%{x}<br>7-day average HRV: %{y:.0f} ms<extra></extra>",
+            hovertemplate="7-day average HRV: %{y:.0f} ms<extra></extra>",
         )
     )
     figure.add_trace(
@@ -945,7 +947,7 @@ def daily_duration_figure(
             mode="lines",
             visible="legendonly",
             line=dict(color=AVERAGE_7_COLOR, width=1, dash="dot"),
-            hovertemplate="%{x}<br>7-day average: %{y:.2f} h<extra></extra>",
+            hovertemplate="7-day average: %{y:.2f} h<extra></extra>",
         )
     )
     figure.add_trace(
@@ -956,7 +958,7 @@ def daily_duration_figure(
             mode="lines",
             visible="legendonly",
             line=dict(color=AVERAGE_28_COLOR, width=1, dash="dot"),
-            hovertemplate="%{x}<br>28-day average: %{y:.2f} h<extra></extra>",
+            hovertemplate="28-day average: %{y:.2f} h<extra></extra>",
         )
     )
     figure.add_trace(
@@ -969,7 +971,7 @@ def daily_duration_figure(
             visible="legendonly",
             connectgaps=False,
             line=dict(color=SLEEP_SCORE_PINK, width=1),
-            hovertemplate="%{x}<br>Sleep score: %{y:.0f}/100<extra></extra>",
+            hovertemplate="Sleep score: %{y:.0f}/100<extra></extra>",
         )
     )
     figure.add_trace(
@@ -983,7 +985,7 @@ def daily_duration_figure(
             connectgaps=False,
             line=dict(color=SLEEP_SCORE_PINK, width=1, dash="dot"),
             hovertemplate=(
-                "%{x}<br>7-day average Sleep score: %{y:.1f}/100<extra></extra>"
+                "7-day average Sleep score: %{y:.1f}/100<extra></extra>"
             ),
         )
     )
@@ -1008,7 +1010,7 @@ def daily_duration_figure(
                 opacity=0,
                 customdata=[phase_customdata],
                 hovertemplate=(
-                    "%{x}<br><b>%{customdata[0]}</b><br>"
+                    "<b>%{customdata[0]}</b><br>"
                     "Cycle day: %{customdata[1]:.0f}<br>"
                     "Cycle began: %{customdata[2]}<extra></extra>"
                 ),
@@ -1037,7 +1039,7 @@ def daily_duration_figure(
                 y=[0.08] * len(zero),
                 marker=dict(color=ZERO_COLOR, line=dict(width=0)),
                 customdata=zero[["source_state"]],
-                hovertemplate="%{x}<br>Zero sleep<br>%{customdata[0]}<extra></extra>",
+                hovertemplate="Zero sleep<br>%{customdata[0]}<extra></extra>",
             )
         )
     _add_no_data_markers(figure, frame)
@@ -1050,7 +1052,7 @@ def daily_duration_figure(
         xaxis=dict(
             title="Sleep date (wake date)",
             type="date",
-            tickformat="%d/%m",
+            tickformat="%d.%m",
             # Never rotate: rotated labels would need more bottom margin.
             tickangle=0,
             # Draw the date axis under the menstrual strip so the axis title
@@ -1102,6 +1104,7 @@ def daily_duration_figure(
         _pannable_date_view(
             figure, frame["date"].min(), frame["date"].max(), view_start, view_end
         )
+    figure.update_xaxes(hoverformat=DATE_HOVER_FORMAT)
     return figure
 
 
@@ -1190,7 +1193,7 @@ def credit_debit_figure(
         ["sleep_hours", "daily_balance", "cumulative_balance", "recent_balance"]
     ]
     hovertemplate = (
-        "%{x|%d/%m/%Y}<br>Slept: %{customdata[0]:.2f} h "
+        "%{x|%d.%m.%Y}<br>Slept: %{customdata[0]:.2f} h "
         "(%{customdata[1]:+.2f} h vs target)<br>"
         "Running balance: %{customdata[2]:+.1f} h<br>"
         f"Last {CREDIT_WINDOW_DAYS} days: %{{customdata[3]:+.1f}} h<extra></extra>"
@@ -1263,7 +1266,7 @@ def credit_debit_figure(
         range=[x_start, x_end],
         minallowed=x_start,
         maxallowed=x_end,
-        tickformat="%d/%m",
+        tickformat="%d.%m",
         gridcolor="#303030",
     )
     figure.update_xaxes(title_text="Date", row=2, col=1)
