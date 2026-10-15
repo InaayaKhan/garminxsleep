@@ -7,8 +7,12 @@ from datetime import date, timedelta
 import streamlit as st
 
 from dashboard.config import DATABASE_PATH
-from dashboard.data import cached_dataset, find_export, garmin_archive_signature
-from dashboard.storage import persist_dataset
+from dashboard.data import (
+    cached_dataset,
+    export_database,
+    find_export,
+    garmin_archive_signature,
+)
 from dashboard.tabs import (
     ViewData,
     activity,
@@ -32,15 +36,22 @@ st.sidebar.caption("Local Garmin and Sleepmeter dashboard")
 
 try:
     export_path = find_export()
-    dataset = cached_dataset(
+    data_version = (
         str(export_path),
         export_path.stat().st_mtime_ns,
         garmin_archive_signature(),
     )
-    persist_dataset(dataset, DATABASE_PATH)
+    dataset = cached_dataset(*data_version)
 except Exception as error:
     st.error(f"Unable to load the Sleepmeter export: {error}")
     st.stop()
+
+# The DuckDB copy is only for SQL analysis; the charts never read it, so a
+# failed write is reported but does not stop the dashboard.
+try:
+    export_database(*data_version, dataset)
+except Exception as error:
+    st.sidebar.warning(f"Could not update {DATABASE_PATH.name}: {error}")
 
 st.sidebar.header("Date range")
 # Open on the most recent DEFAULT_RANGE_DAYS; earlier dates stay selectable.

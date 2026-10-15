@@ -4,13 +4,21 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from datetime import date
 from pathlib import Path
 
 import streamlit as st
 
-from dashboard.config import DATA_ROOT, RAW_ROOT, TIMEZONE_NAME, garmin_start_date
+from dashboard.config import (
+    DATA_ROOT,
+    DATABASE_PATH,
+    RAW_ROOT,
+    TIMEZONE_NAME,
+    garmin_start_date,
+)
 from dashboard.model import SleepDataset, load_combined_sleep_data
+from dashboard.storage import persist_dataset
 
 GARMIN_RAW_ROOTS = [RAW_ROOT]
 GARMIN_AID_OVERRIDES_PATH = DATA_ROOT / "garmin_aid_overrides.json"
@@ -84,3 +92,25 @@ def cached_dataset(
         merge_overrides_path=GARMIN_MERGE_OVERRIDES_PATH,
         timezone_name=TIMEZONE_NAME,
     )
+
+
+# Streamlit runs overlapping reruns in parallel (e.g. while a slider is being
+# dragged); DuckDB rejects simultaneous writes to the same file.
+_export_lock = threading.Lock()
+
+
+@st.cache_resource(show_spinner=False)
+def export_database(
+    path_text: str,
+    modified_ns: int,
+    raw_signature: tuple[tuple[str, int, int], ...],
+    _dataset: SleepDataset,
+) -> Path:
+    """Write the DuckDB copy once per version of the data, not on every rerun.
+
+    The arguments other than ``_dataset`` identify the data version (the same
+    key as ``cached_dataset``); ``_dataset`` is excluded from hashing.
+    """
+    del path_text, modified_ns, raw_signature
+    with _export_lock:
+        return persist_dataset(_dataset, DATABASE_PATH)
