@@ -20,9 +20,8 @@ def render(view: ViewData) -> None:
     st.markdown(
         'How much and how well you slept each day. Drag the first three charts sideways to pan back in time. They move together.'
     )
-    show_duration_stages = st.toggle(
-        "Show sleep stages in duration chart", value=True
-    )
+    # One switch for both charts, so they always show the same thing.
+    show_sleep_stages = st.toggle("Show sleep stages", value=True)
     duration_chart = daily_duration_figure(
         view.history.daily,
         view.history.sessions,
@@ -30,7 +29,7 @@ def render(view: ViewData) -> None:
         view.history.menstrual,
         view.history.sleep_stages,
         view.history.activities,
-        show_sleep_stages=show_duration_stages,
+        show_sleep_stages=show_sleep_stages,
         view_start=view.start_date,
         view_end=view.end_date,
     )
@@ -46,9 +45,6 @@ def render(view: ViewData) -> None:
             "over it to see the phase, cycle day, and cycle start date. Drag sideways to "
             "pan back through earlier dates; the 24-hour chart below follows."
         )
-    )
-    show_sleep_stages = st.toggle(
-        "Show sleep stages in 24-hour chart", value=True
     )
     st.plotly_chart(
         sleep_stage_schedule_figure(

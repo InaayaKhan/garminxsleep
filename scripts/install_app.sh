@@ -45,7 +45,17 @@ if ! "$python" -c "import webview" 2>/dev/null; then
 fi
 
 rm -rf "$app" "$old_app"
-mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+
+# App icon: every size macOS asks for, made from the 1024 px PNG.
+iconset=$(mktemp -d)/GarminxSleep.iconset
+mkdir -p "$iconset"
+for size in 16 32 128 256 512; do
+  sips -z $size $size "$project/dashboard/assets/app_icon.png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+  sips -z $((size * 2)) $((size * 2)) "$project/dashboard/assets/app_icon.png" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+done
+iconutil -c icns "$iconset" -o "$app/Contents/Resources/GarminxSleep.icns"
+rm -rf "${iconset:h}"
 cat >"$app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -55,6 +65,7 @@ cat >"$app/Contents/Info.plist" <<EOF
   <key>CFBundleDisplayName</key><string>$name</string>
   <key>CFBundleIdentifier</key><string>com.garminxsleep.dashboard</string>
   <key>CFBundleExecutable</key><string>launch</string>
+  <key>CFBundleIconFile</key><string>GarminxSleep</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>NSHighResolutionCapable</key><true/>
@@ -69,4 +80,6 @@ cd "$project"
 exec "$python" -m dashboard.desktop >>"$data_dir/app.log" 2>&1
 EOF
 chmod +x "$app/Contents/MacOS/launch"
+# Make Finder and the Dock pick up the new icon instead of a cached one.
+touch "$app"
 print "Installed $app (data: $data_dir). Open it from Applications, Launchpad or Spotlight; drag it to the Dock to keep it there."

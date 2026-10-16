@@ -20,6 +20,7 @@ from pathlib import Path
 
 APP_SCRIPT = Path(__file__).resolve().parent / "app.py"
 WINDOW_TITLE = "GarminxSleep"
+APP_ICON = APP_SCRIPT.parent / "assets" / "app_icon.png"
 STARTUP_TIMEOUT_SECONDS = 90
 
 
@@ -84,6 +85,22 @@ def _name_application() -> None:
         pass  # Cosmetic only; other platforms or a missing PyObjC are fine.
 
 
+def _set_dock_icon() -> None:
+    """Show the GarminxSleep icon in the Dock while the window is open.
+
+    The app bundle's launcher runs Python, which would otherwise show
+    Python's own icon in the Dock.
+    """
+    try:
+        from AppKit import NSApplication, NSImage
+
+        icon = NSImage.alloc().initWithContentsOfFile_(str(APP_ICON))
+        if icon is not None:
+            NSApplication.sharedApplication().setApplicationIconImage_(icon)
+    except Exception:
+        pass  # Cosmetic only; other platforms or a missing PyObjC are fine.
+
+
 def main() -> int:
     import webview
 
@@ -92,6 +109,7 @@ def main() -> int:
     try:
         wait_until_ready(server, port)
         _name_application()
+        _set_dock_icon()
         webview.create_window(
             WINDOW_TITLE,
             f"http://127.0.0.1:{port}",

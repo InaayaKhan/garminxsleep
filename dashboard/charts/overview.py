@@ -225,6 +225,27 @@ def sleep_stage_schedule_figure(
                 cursor = segment_end
 
     stage_frame = pd.DataFrame(stage_segments)
+
+    # Every bar of a session hovers the same: its sleep window and how long
+    # was slept, whether or not stages are shown.
+    def _session_hover(row) -> list[str]:
+        minutes = float(row.sleep_minutes) if pd.notna(row.sleep_minutes) else 0.0
+        return [
+            "Nap" if row.session_type == "NAP" else "Night sleep",
+            f"{row.sleep_start:%d.%m.%Y %H:%M}",
+            f"{row.wake_time:%d.%m.%Y %H:%M}",
+            f"{int(minutes // 60)}h {int(round(minutes % 60)):02d}m",
+        ]
+
+    session_hover = {
+        row.session_id: _session_hover(row)
+        for row in sessions.itertuples(index=False)
+    }
+    session_hovertemplate = (
+        "<b>%{customdata[0]}</b><br>"
+        "%{customdata[1]} → %{customdata[2]}<br>"
+        "Asleep: %{customdata[3]}<extra></extra>"
+    )
     stage_colors = {
         "Deep": "#3A1F99" if previous_colors else "#331B8C",
         "Light": "#8F6BFF" if previous_colors else "#5B32D6",
@@ -252,13 +273,7 @@ def sleep_stage_schedule_figure(
             stage_rows = stage_frame[stage_frame["stage"] == stage_name]
             if stage_rows.empty:
                 continue
-            customdata = [
-                [
-                    row.interval_start.strftime("%d.%m.%Y %H:%M"),
-                    row.interval_end.strftime("%d.%m.%Y %H:%M"),
-                ]
-                for row in stage_rows.itertuples(index=False)
-            ]
+            customdata = [session_hover[session_id] for session_id in stage_rows["session_id"]]
             figure.add_trace(
                 go.Bar(
                     name=stage_name,
@@ -277,10 +292,7 @@ def sleep_stage_schedule_figure(
                         else stage_name
                     ),
                     customdata=customdata,
-                    hovertemplate=(
-                        f"<b>{stage_name}</b><br>"
-                        "%{customdata[0]} → %{customdata[1]}<extra></extra>"
-                    ),
+                    hovertemplate=session_hovertemplate,
                 )
             )
 
@@ -333,16 +345,10 @@ def sleep_stage_schedule_figure(
                         else True
                     ),
                     customdata=[
-                        [
-                            row.session_start.strftime("%d.%m.%Y %H:%M"),
-                            row.session_wake.strftime("%d.%m.%Y %H:%M"),
-                        ]
-                        for row in unavailable_rows.itertuples(index=False)
+                        session_hover[session_id]
+                        for session_id in unavailable_rows["session_id"]
                     ],
-                    hovertemplate=(
-                        f"<b>{trace_name}</b><br>"
-                        "%{customdata[0]} → %{customdata[1]}<extra></extra>"
-                    ),
+                    hovertemplate=session_hovertemplate,
                 )
             )
 
