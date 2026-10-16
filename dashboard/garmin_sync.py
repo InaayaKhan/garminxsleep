@@ -33,6 +33,17 @@ PROFILE_BUDGETS = {"daily": 50, "weekly": 20, "backfill": 100}
 CATCH_UP_REQUESTS_PER_DAY = 10
 CATCH_UP_EXTRA_REQUESTS = 90
 STATE_FILE = "sync_state.json"
+# Refresh mode for the daily profile: re-download a saved file only while it
+# may still change (see _needs_refresh), instead of always or never.
+REFRESH_INCOMPLETE = "incomplete"
+# A saved file counts as empty when this field is missing or empty.
+COMPLETENESS_FIELDS = {
+    "sleep": ("dailySleepDTO", "sleepTimeSeconds"),
+    "hrv": ("hrvSummary",),
+    "daily_summary": ("totalSteps",),
+    "heart_rate": ("heartRateValues",),
+    "stress": ("stressValuesArray",),
+}
 
 
 def _default_private_root() -> Path:
@@ -128,6 +139,41 @@ def _login(private_root: Path, client_path: Path | None) -> Any:
     return client
 
 
+def _last_day_covered(relative_path: str) -> date | None:
+    """The last date a file covers, from names like 2026-05-11 or 2026-05-01_2026-05-11."""
+    stem = Path(relative_path).stem
+    try:
+        return date.fromisoformat(stem.split("_")[-1])
+    except ValueError:
+        return None
+
+
+def _looks_empty(relative_path: str, destination: Path) -> bool:
+    try:
+        value = json.loads(destination.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True
+    for key in COMPLETENESS_FIELDS.get(relative_path.split("/")[0], ()):
+        value = value.get(key) if isinstance(value, dict) else None
+    return value is None or value == [] or value == {}
+
+
+def _needs_refresh(relative_path: str, destination: Path) -> bool:
+    """Whether a saved file may still be missing data Garmin has since received.
+
+    A file is final once it was saved after the last day it covers had ended
+    and it isn't empty. Saved earlier, the day was still in progress (naps,
+    steps, activities to come). Empty, the watch probably hadn't synced yet.
+    """
+    if _looks_empty(relative_path, destination):
+        return True
+    last_day = _last_day_covered(relative_path)
+    if last_day is None:
+        return False
+    saved_at = datetime.fromtimestamp(destination.stat().st_mtime)
+    return saved_at < datetime.combine(last_day + timedelta(days=1), datetime.min.time())
+
+
 class RequestBudgetReached(Exception):
     """Raised before a request would exceed the configured hard limit."""
 
@@ -142,7 +188,7 @@ class Collector:
         raw_root: Path,
         max_requests: int,
         request_delay: float,
-        refresh_existing: bool,
+        refresh_existing: bool | str,
     ) -> None:
         self.raw_root = raw_root
         self.max_requests = max_requests
@@ -165,6 +211,8 @@ class Collector:
         should_refresh = (
             self.refresh_existing if refresh_existing is None else refresh_existing
         )
+        if should_refresh == REFRESH_INCOMPLETE and destination.exists():
+            should_refresh = _needs_refresh(relative_path, destination)
         if destination.exists() and not should_refresh:
             self.skipped_files.append(relative_path)
             print(f"Skipping cached {relative_path}")
@@ -227,6 +275,10 @@ def _collect_daily_health(
         ("stress", client.get_all_day_stress),
         ("body_battery_events", client.get_body_battery_events),
     )
+    if collector.refresh_existing == REFRESH_INCOMPLETE:
+        # Today isn't over, so its totals would be partial and fetched again
+        # tomorrow anyway; wait until it has ended.
+        days = [current for current in days if current < date.today()]
     for current in days:
         day = current.isoformat()
         for folder, function in daily_calls:
@@ -366,7 +418,7 @@ def _read_state(private_root: Path) -> dict[str, Any]:
 
 
 def sync(
-    windows: list[tuple[date, date, bool]],
+    windows: list[tuple[date, date, bool | str]],
     private_root: Path,
     collectors: tuple[str, ...],
     max_requests: int,
@@ -472,7 +524,11 @@ def _arguments() -> argparse.Namespace:
         "--refresh-existing",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="Replace cached responses. Daily/weekly default on; backfill default off.",
+        help=(
+            "Replace saved responses (--refresh-existing) or never "
+            "(--no-refresh-existing). By default daily re-downloads only files "
+            "that may still change, weekly replaces them, and backfill keeps them."
+        ),
     )
     parser.add_argument(
         "--catch-up",
@@ -521,11 +577,13 @@ def main() -> int:
     max_requests = arguments.max_requests or PROFILE_BUDGETS[arguments.profile]
     if max_requests < 1:
         raise ValueError("--max-requests must be at least 1")
-    refresh_existing = (
-        arguments.refresh_existing
-        if arguments.refresh_existing is not None
-        else arguments.profile != "backfill"
-    )
+    refresh_existing: bool | str
+    if arguments.refresh_existing is not None:
+        refresh_existing = arguments.refresh_existing
+    elif arguments.profile == "daily":
+        refresh_existing = REFRESH_INCOMPLETE
+    else:
+        refresh_existing = arguments.profile == "weekly"
     client_path = (
         arguments.client_path.expanduser().resolve()
         if arguments.client_path is not None
@@ -553,9 +611,9 @@ def main() -> int:
             gap_start = earliest
         if gap_start < start:
             gap_days = (start - gap_start).days
-            # Recent days first (refreshed as usual), then the missed days, where
-            # files already saved by an interrupted catch-up are skipped.
-            windows.append((gap_start, start - timedelta(days=1), False))
+            # Recent days first, then the missed days, where complete files
+            # already saved by an interrupted catch-up are skipped.
+            windows.append((gap_start, start - timedelta(days=1), REFRESH_INCOMPLETE))
             print(f"Catching up {gap_days} missed day(s) from {gap_start.isoformat()}.")
             if arguments.max_requests is None:
                 max_requests += min(

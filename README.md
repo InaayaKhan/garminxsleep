@@ -88,7 +88,10 @@ python -m pip install -e ".[sync]"
 python -m dashboard.garmin_sync
 ```
 
-This fetches the last three days. The first run asks for your Garmin email,
+This checks the last three days and downloads only what's new or may still
+change: last night's sleep, yesterday's totals once the day has ended, and
+anything saved empty because the watch hadn't synced yet. Days already saved
+complete aren't downloaded again. The first run asks for your Garmin email,
 password, and MFA code. The password isn't saved; a reusable token and the raw
 JSON responses go into your data folder. Requests are sequential, at least one
 second apart, and capped per run. A Garmin `429` stops the run immediately.
