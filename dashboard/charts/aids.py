@@ -11,7 +11,6 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from dashboard.charts.common import (
-    DATE_CHART_SIDE_MARGINS,
     DATE_HOVER_FORMAT,
     NAP_BAR_COLOR,
     NIGHT_BAR_COLOR,
@@ -371,7 +370,7 @@ def aid_duration_timeline_figure(
         title="Daily sleep duration by recorded sleep aid",
         barmode="stack",
         height=520,
-        margin=dict(**DATE_CHART_SIDE_MARGINS, t=64, b=72),
+        margin=dict(l=70, r=70, t=64, b=72),
         xaxis=dict(
             title="Sleep date (wake date)",
             type="date",
@@ -395,7 +394,12 @@ def aid_duration_timeline_figure(
     )
     if not frame.empty:
         _pannable_date_view(
-            figure, frame["date"].min(), frame["date"].max(), view_start, view_end
+            figure,
+            frame["date"].min(),
+            frame["date"].max(),
+            view_start,
+            view_end,
+            right_legend=False,
         )
     figure.update_xaxes(hoverformat=DATE_HOVER_FORMAT)
     return figure

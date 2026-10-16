@@ -48,6 +48,10 @@ MENSTRUAL_PHASE_COLORS = {
 
 
 MENSTRUAL_STRIP_PX = 7
+# Height of the band under the date charts that holds the menstrual strip:
+# the strip plus a small gap before the chart starts. Shared so the duration
+# and 24-hour charts look the same.
+MENSTRUAL_STRIP_BAND_PX = 20
 
 
 def hour_px(figure: go.Figure) -> float:
@@ -478,7 +482,7 @@ def sleep_stage_schedule_figure(
         ).mean()
         figure.add_trace(
             go.Scatter(
-                name="Garmin Sleep score",
+                name="Sleep score",
                 x=score_frame["date_plot"],
                 y=score_frame["score_100"],
                 yaxis="y3",
@@ -487,7 +491,7 @@ def sleep_stage_schedule_figure(
                 connectgaps=False,
                 line=dict(color=SLEEP_SCORE_PINK, width=1),
                 hovertemplate=(
-                    "%{x|%d.%m.%Y}<br>Garmin Sleep score: %{y:.0f}/100<extra></extra>"
+                    "%{x|%d.%m.%Y}<br>Sleep score: %{y:.0f}/100<extra></extra>"
                 ),
             )
         )
@@ -584,11 +588,11 @@ def sleep_stage_schedule_figure(
             zeroline=False,
             # No axis line: it would run directly under the menstrual strip.
             showline=False,
-            tickfont=dict(size=14),
-            title_font=dict(size=18),
-            # Dates sit below the menstrual strip band rather than under it.
-            anchor="free",
-            position=0,
+            # Dates sit below the menstrual strip, spaced and sized like the
+            # duration chart's date axis.
+            anchor="y4" if not menstrual.empty else "y",
+            ticks="outside",
+            ticklen=5,
         ),
         yaxis=dict(
             title="Time of day",
@@ -648,16 +652,19 @@ def sleep_stage_schedule_figure(
         ),
     )
     _pannable_date_view(figure, start_date, end_date, view_start, view_end)
+    margins = figure.layout.margin.t + figure.layout.margin.b
+    band_px = MENSTRUAL_STRIP_BAND_PX if not menstrual.empty else 0
     if match_hour_px:
-        domain_start, domain_end = figure.layout.yaxis.domain
         range_start, range_end = figure.layout.yaxis.range
-        plot_height = (
-            match_hour_px * (range_end - range_start) / (domain_end - domain_start)
-        )
+        plot_height = match_hour_px * (range_end - range_start) + band_px
+        figure.update_layout(height=round(margins + plot_height))
+    else:
+        plot_height = figure.layout.height - margins
+    if band_px:
+        # Size the strip band in pixels so the gap stays small at any height.
         figure.update_layout(
-            height=round(
-                figure.layout.margin.t + figure.layout.margin.b + plot_height
-            )
+            yaxis_domain=[band_px / plot_height, 1.0],
+            yaxis4_domain=[0.0, MENSTRUAL_STRIP_PX / plot_height],
         )
     return figure
 
@@ -1096,8 +1103,16 @@ def daily_duration_figure(
     )
     # Fixed range and legend space give the plot a known hour scale, which the
     # 24-hour stage chart copies.
+    plot_height = figure.layout.height - figure.layout.margin.t - figure.layout.margin.b
+    top_hours = max(_stacked_bar_top(figure) * 1.05, 1.0)
+    # The 24-hour chart's axis starts half an hour below 00:00, so its first
+    # bars sit that much above its strip band. Add the same half hour here so
+    # both charts show the same gap between the strip and the bars.
+    band_px = (MENSTRUAL_STRIP_BAND_PX * top_hours + 0.5 * plot_height) / (top_hours + 0.5)
     figure.update_layout(
-        yaxis_range=[0, max(_stacked_bar_top(figure) * 1.05, 1.0)],
+        yaxis_range=[0, top_hours],
+        yaxis_domain=[band_px / plot_height, 1.0],
+        yaxis4_domain=[0.0, MENSTRUAL_STRIP_PX / plot_height],
         meta=DATE_CHART_RIGHT_LEGEND,
     )
     if not frame.empty:

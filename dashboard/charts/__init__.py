@@ -14,16 +14,13 @@ from dashboard.charts.overview import (
     sleep_stage_schedule_figure,
 )
 from dashboard.charts.patterns import (
-    calendar_sleep_heatmap,
-    calendar_sleep_score_heatmap,
     daily_duration_histogram,
     nightly_duration_histogram,
     sleep_nap_pie_figure,
     sleep_state_pie_figure,
 )
 from dashboard.charts.timing import (
-    asleep_time_vs_duration_figure,
-    asleep_time_vs_score_figure,
+    asleep_time_vs_sleep_figure,
     asleep_time_weekend_highlight_figure,
     daily_duration_by_weekday_boxplot,
     hourly_sleep_punch_card,
@@ -76,14 +73,11 @@ __all__ = [
     "aid_figure",
     "aid_score_figure",
     "aid_sleep_stage_composition_figure",
-    "asleep_time_vs_duration_figure",
-    "asleep_time_vs_score_figure",
+    "asleep_time_vs_sleep_figure",
     "asleep_time_weekend_highlight_figure",
     "awakenings_efficiency_figure",
     "calendar_activity_heatmap",
     "calendar_intensity_minutes_heatmap",
-    "calendar_sleep_heatmap",
-    "calendar_sleep_score_heatmap",
     "credit_debit_figure",
     "daily_calories_stacked_figure",
     "daily_duration_by_weekday_boxplot",

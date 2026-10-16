@@ -1,4 +1,4 @@
-"""Charts on the Patterns tab: duration distributions, sleep vs naps, sleep calendars."""
+"""Charts on the Patterns tab: duration distributions and sleep vs naps."""
 
 from __future__ import annotations
 
@@ -10,8 +10,6 @@ import plotly.graph_objects as go
 from dashboard.charts.common import (
     NAP_BAR_COLOR,
     NIGHT_BAR_COLOR,
-    SLEEP_SCORE_PINK,
-    WEEKDAY_ORDER,
 )
 
 
@@ -108,7 +106,7 @@ def sleep_state_pie_figure(
                 direction="clockwise",
                 marker=dict(
                     colors=[NIGHT_BAR_COLOR, NAP_BAR_COLOR, "#64748b", AVERAGE_3_COLOR],
-                    line=dict(color="rgba(14, 17, 23, 0.9)", width=1),
+                    line=dict(width=0),
                 ),
                 textinfo="label+percent",
                 customdata=[[value / 60] for value in values],
@@ -158,7 +156,7 @@ def sleep_nap_pie_figure(sessions: pd.DataFrame) -> go.Figure:
                 direction="clockwise",
                 marker=dict(
                     colors=[NIGHT_BAR_COLOR, NAP_BAR_COLOR],
-                    line=dict(color="rgba(14, 17, 23, 0.9)", width=1),
+                    line=dict(width=0),
                 ),
                 textinfo="label+percent",
                 customdata=[[value / 60] for value in values],
@@ -173,144 +171,5 @@ def sleep_nap_pie_figure(sessions: pd.DataFrame) -> go.Figure:
         height=520,
         margin=dict(l=40, r=40, t=64, b=40),
         legend=dict(orientation="h", yanchor="bottom", y=-0.05, x=0),
-    )
-    return figure
-
-
-def calendar_sleep_heatmap(daily: pd.DataFrame) -> go.Figure:
-    frame = daily.copy()
-    frame["timestamp"] = pd.to_datetime(frame["date"])
-    frame["week_start"] = frame["timestamp"] - pd.to_timedelta(
-        frame["timestamp"].dt.dayofweek, unit="D"
-    )
-    frame["weekday_number"] = frame["timestamp"].dt.dayofweek
-    frame["sleep_hours"] = frame["total_sleep_minutes"] / 60
-    weeks = sorted(frame["week_start"].drop_duplicates())
-    week_lookup = {week: index for index, week in enumerate(weeks)}
-    frame["week_number"] = frame["week_start"].map(week_lookup)
-    frame["weekday"] = frame["weekday_number"].map(dict(enumerate(WEEKDAY_ORDER)))
-    frame["date_text"] = frame["timestamp"].dt.strftime("%d.%m.%Y")
-
-    figure = go.Figure(
-        go.Scatter(
-            x=frame["week_number"],
-            y=frame["weekday"],
-            mode="markers",
-            marker=dict(
-                symbol="square",
-                size=16,
-                color=frame["sleep_hours"],
-                cmin=0,
-                cmax=max(12.0, float(frame["sleep_hours"].max())),
-                colorscale=[
-                    [0.0, "#111b2e"],
-                    [0.5, "#145DA0"],
-                    [1.0, NAP_BAR_COLOR],
-                ],
-                line=dict(color="rgba(255, 255, 255, 0.2)", width=1.5),
-                colorbar=dict(title="Hours", thickness=12),
-            ),
-            customdata=frame[["date_text", "sleep_hours"]],
-            hovertemplate=(
-                "%{customdata[0]}<br>Sleep: %{customdata[1]:.2f} h<extra></extra>"
-            ),
-            showlegend=False,
-        )
-    )
-    tick_positions = list(range(0, len(weeks), max(1, len(weeks) // 10 or 1)))
-    figure.update_layout(
-        title="Daily sleep duration calendar",
-        height=330,
-        margin=dict(l=80, r=65, t=64, b=56),
-        xaxis=dict(
-            title="Week starting",
-            tickmode="array",
-            tickvals=tick_positions,
-            ticktext=[pd.Timestamp(weeks[index]).strftime("%d.%m") for index in tick_positions],
-            showgrid=False,
-            zeroline=False,
-        ),
-        yaxis=dict(
-            title="Day of week",
-            categoryorder="array",
-            categoryarray=WEEKDAY_ORDER,
-            autorange="reversed",
-            showgrid=False,
-        ),
-    )
-    return figure
-
-
-def calendar_sleep_score_heatmap(
-    daily: pd.DataFrame, sessions: pd.DataFrame
-) -> go.Figure:
-    frame = daily[["date"]].copy()
-    scored_nights = sessions[
-        (sessions["session_type"] == "NIGHT_SLEEP")
-        & sessions["legacy_garmin_score_10"].notna()
-    ]
-    scores = (
-        scored_nights.groupby("sleep_date")["legacy_garmin_score_10"].mean() * 10
-    )
-    frame["score"] = frame["date"].map(scores)
-    frame["timestamp"] = pd.to_datetime(frame["date"])
-    frame["week_start"] = frame["timestamp"] - pd.to_timedelta(
-        frame["timestamp"].dt.dayofweek, unit="D"
-    )
-    frame["weekday_number"] = frame["timestamp"].dt.dayofweek
-    weeks = sorted(frame["week_start"].drop_duplicates())
-    week_lookup = {week: index for index, week in enumerate(weeks)}
-    frame["week_number"] = frame["week_start"].map(week_lookup)
-    frame["weekday"] = frame["weekday_number"].map(dict(enumerate(WEEKDAY_ORDER)))
-    frame["date_text"] = frame["timestamp"].dt.strftime("%d.%m.%Y")
-    scored_frame = frame[frame["score"].notna()]
-
-    figure = go.Figure(
-        go.Scatter(
-            x=scored_frame["week_number"],
-            y=scored_frame["weekday"],
-            mode="markers",
-            marker=dict(
-                symbol="square",
-                size=16,
-                color=scored_frame["score"],
-                cmin=0,
-                cmax=100,
-                colorscale=[
-                    [0.0, "#2A1721"],
-                    [0.5, "#9C496F"],
-                    [1.0, SLEEP_SCORE_PINK],
-                ],
-                line=dict(color="rgba(255, 255, 255, 0.2)", width=1.5),
-                colorbar=dict(title="Score", thickness=12),
-            ),
-            customdata=scored_frame[["date_text", "score"]],
-            hovertemplate=(
-                "%{customdata[0]}<br>Garmin Sleep score: "
-                "%{customdata[1]:.0f}/100<extra></extra>"
-            ),
-            showlegend=False,
-        )
-    )
-    tick_positions = list(range(0, len(weeks), max(1, len(weeks) // 10 or 1)))
-    figure.update_layout(
-        title="Garmin Sleep score calendar",
-        height=330,
-        margin=dict(l=80, r=65, t=64, b=56),
-        xaxis=dict(
-            title="Week starting",
-            tickmode="array",
-            tickvals=tick_positions,
-            ticktext=[pd.Timestamp(weeks[index]).strftime("%d.%m") for index in tick_positions],
-            showgrid=False,
-            zeroline=False,
-        ),
-        yaxis=dict(
-            title="Day of week",
-            categoryorder="array",
-            categoryarray=WEEKDAY_ORDER,
-            autorange="reversed",
-            showgrid=False,
-        ),
     )
     return figure

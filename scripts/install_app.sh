@@ -40,7 +40,7 @@ if [[ ! -x $python ]]; then
   exit 1
 fi
 if ! "$python" -c "import webview" 2>/dev/null; then
-  print -u2 "pywebview is missing. Install the app extra first:  $python -m pip install -e \"$project[app]\""
+  print -u2 "pywebview is missing. Install the app extra first:  $python -m pip install -e \"${project}[app]\""
   exit 1
 fi
 

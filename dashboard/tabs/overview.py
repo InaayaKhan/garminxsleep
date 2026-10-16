@@ -18,17 +18,8 @@ from dashboard.ui import format_duration, link_pannable_charts
 
 def render(view: ViewData) -> None:
     st.markdown(
-        'How much and how well you slept each day. Drag the first three charts sideways to pan back in time; they move together.'
+        'How much and how well you slept each day. Drag the first three charts sideways to pan back in time. They move together.'
     )
-    # Summary of the selected date range (the sidebar is collapsed by default).
-    daily = view.selected.daily
-    days = len(daily)
-    average_minutes = daily["total_sleep_minutes"].mean() if days else 0
-    days_column, average_column, zero_column, sessions_column = st.columns(4)
-    days_column.metric("Calendar days", days)
-    average_column.metric("Average daily sleep", format_duration(float(average_minutes)))
-    zero_column.metric("Zero-sleep days", int(daily["zero_sleep"].sum()) if days else 0)
-    sessions_column.metric("Recorded sessions", len(view.selected.sessions))
     show_duration_stages = st.toggle(
         "Show sleep stages in duration chart", value=True
     )
@@ -47,14 +38,14 @@ def render(view: ViewData) -> None:
         duration_chart,
         width="stretch",
         config={"displaylogo": False},
-    )
-    st.caption(
-        "Daily totals use the wake date. Rolling averages include missing historical "
-        "dates and zero-duration placeholders as zero sleep. The 7- and 28-day "
-        "averages start hidden; click their legend entries to show them."
-        " The colored strip below the x-axis shows Garmin's menstrual phase; hover "
-        "over it to see the phase, cycle day, and cycle start date. Drag sideways to "
-        "pan back through earlier dates; the 24-hour chart below follows."
+        info=(
+            "Daily totals use the wake date. Rolling averages include missing historical "
+            "dates and zero-duration placeholders as zero sleep. The 7- and 28-day "
+            "averages start hidden; click their legend entries to show them."
+            " The colored strip below the x-axis shows Garmin's menstrual phase; hover "
+            "over it to see the phase, cycle day, and cycle start date. Drag sideways to "
+            "pan back through earlier dates; the 24-hour chart below follows."
+        )
     )
     show_sleep_stages = st.toggle(
         "Show sleep stages in 24-hour chart", value=True
@@ -82,16 +73,16 @@ def render(view: ViewData) -> None:
         ),
         width="stretch",
         config={"displaylogo": False, "scrollZoom": False},
+        info=(
+            "Garmin nights show Deep, Light, REM, and Unmeasurable stages; recorded awake "
+            "periods are left as unfilled gaps. Completed Garmin workouts and other "
+            "recorded activities appear as green time blocks. Sleepmeter history and any "
+            "records without stage samples use the striped unavailable pattern; zero-sleep days remain red. The "
+            "menstrual phase strip uses the same colors and cycle boundaries as the "
+            "duration chart."
+        )
     )
     link_pannable_charts()
-    st.caption(
-        "Garmin nights show Deep, Light, REM, and Unmeasurable stages; recorded awake "
-        "periods are left as unfilled gaps. Completed Garmin workouts and other "
-        "recorded activities appear as green time blocks. Sleepmeter history and any "
-        "records without stage samples use the striped unavailable pattern; zero-sleep days remain red. The "
-        "menstrual phase strip uses the same colors and cycle boundaries as the "
-        "duration chart."
-    )
     st.plotly_chart(
         sleep_composition_figure(
             view.history.garmin_metrics,
@@ -102,10 +93,10 @@ def render(view: ViewData) -> None:
         ),
         width="stretch",
         config={"displaylogo": False},
-    )
-    st.caption(
-        "Each recorded Garmin night is normalized to 100%, showing the relative "
-        "share of Deep, REM, Light, and Awake time."
+        info=(
+            "Each recorded Garmin night is normalized to 100%, showing the relative "
+            "share of Deep, REM, Light, and Awake time."
+        )
     )
     st.subheader("Sleep balance")
     credit_target_minutes = st.select_slider(
@@ -119,11 +110,11 @@ def render(view: ViewData) -> None:
         credit_debit_figure(view.selected.daily, credit_target_minutes / 60),
         width="stretch",
         config={"displaylogo": False},
-    )
-    st.caption(
-        "Each day adds the hours slept (naps included) minus the "
-        f"{format_duration(credit_target_minutes)} target. The top panel is the running "
-        "total over the selected range, with its trend; the bottom panel is the "
-        "balance over the last 14 days, red when behind. Days without any sleep "
-        "record are left out."
+        info=(
+            "Each day adds the hours slept (naps included) minus the "
+            f"{format_duration(credit_target_minutes)} target. The top panel is the running "
+            "total over the selected range, with its trend; the bottom panel is the "
+            "balance over the last 14 days, red when behind. Days without any sleep "
+            "record are left out."
+        )
     )

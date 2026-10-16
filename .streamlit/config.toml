@@ -1,0 +1,5 @@
+[theme]
+# A custom theme defaults to light; the charts and the cream logo are made for dark.
+base = "dark"
+# Accent for the date presets, selected tab, sliders and toggles: REM sleep pink.
+primaryColor = "#EE55C0"

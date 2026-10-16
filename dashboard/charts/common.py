@@ -67,11 +67,13 @@ def _pannable_date_view(
     data_end: date,
     view_start: date | None,
     view_end: date | None,
+    right_legend: bool = True,
 ) -> None:
     """Show ``view_start``..``view_end`` but let the user pan across all data.
 
     Only the date axis moves: y-axes are fixed and panning stops at the first
-    and last day with data.
+    and last day with data. ``right_legend`` keeps the stacked legend on the
+    right that the Overview charts share; other charts use the bottom row.
     """
     lower = pd.Timestamp(data_start)
     upper = pd.Timestamp(data_end) + pd.Timedelta(days=1)
@@ -81,7 +83,8 @@ def _pannable_date_view(
     ]
     figure.update_xaxes(range=visible, minallowed=lower, maxallowed=upper)
     figure.update_yaxes(fixedrange=True)
-    figure.update_layout(meta={**DATE_CHART_RIGHT_LEGEND, "pan": True})
+    meta = DATE_CHART_RIGHT_LEGEND if right_legend else {}
+    figure.update_layout(meta={**meta, "pan": True})
 
 
 def _add_no_data_markers(figure: go.Figure, frame: pd.DataFrame) -> None:

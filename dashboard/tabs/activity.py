@@ -17,6 +17,21 @@ from dashboard.charts import (
 from dashboard.tabs import ViewData
 
 
+# Shown behind the info icon on the section heading.
+PAIRING_INFO = (
+    "Activity charts pair each activity day with the first night sleep starting "
+    "after that day's final recorded activity. Intensity minutes, steps and floors "
+    "pair each day with the first night sleep starting after noon that day. "
+    "Dotted lines show simple overall trends, not causation."
+)
+
+
+def _plot(figure) -> None:
+    st.plotly_chart(
+        figure, width="stretch", config={"displaylogo": False, "scrollZoom": False}
+    )
+
+
 def render(view: ViewData) -> None:
     st.markdown(
         "Your activity, and how the following night compares. Each activity or day is paired with the next night's sleep."
@@ -37,14 +52,7 @@ def render(view: ViewData) -> None:
             width="stretch",
             config={"displaylogo": False},
         )
-    st.subheader("Activities vs the following night")
-    st.plotly_chart(
-        activity_type_comparison_figure(
-            view.selected.activities, view.selected.sessions, view.selected.garmin_metrics
-        ),
-        width="stretch",
-        config={"displaylogo": False},
-    )
+    st.subheader("Activity and the following night", help=PAIRING_INFO)
     st.plotly_chart(
         activity_intensity_effect_figure(
             view.selected.activities, view.selected.sessions, view.selected.garmin_metrics
@@ -52,37 +60,36 @@ def render(view: ViewData) -> None:
         width="stretch",
         config={"displaylogo": False},
     )
+    # Breathing room between the scatter row above and the box plots.
+    st.markdown('<div style="height:2.5rem"></div>', unsafe_allow_html=True)
+    st.plotly_chart(
+        activity_type_comparison_figure(
+            view.selected.activities, view.selected.sessions, view.selected.garmin_metrics
+        ),
+        width="stretch",
+        config={"displaylogo": False},
+    )
     # Both predictors shown together: duration, then time from activity to sleep.
     for predictor in ("duration", "gap"):
-        st.plotly_chart(
+        _plot(
             activity_effect_on_sleep_figure(
                 view.selected.activities,
                 view.selected.sessions,
                 view.selected.garmin_metrics,
                 predictor=predictor,
             ),
-            width="stretch",
-            config={"displaylogo": False},
         )
-    st.caption(
-        "Each activity day is paired with the first night sleep starting after that "
-        "day's final recorded activity. Lines show simple overall trends, not causation."
-    )
-    st.subheader("Daily load vs the following night")
-    st.plotly_chart(
+    _plot(
         intensity_minutes_vs_subsequent_sleep_figure(
             view.selected.garmin_metrics, view.selected.sessions
         ),
-        width="stretch",
-        config={"displaylogo": False, "scrollZoom": False},
     )
-    st.plotly_chart(
-        steps_floors_vs_subsequent_sleep_figure(
-            view.selected.garmin_metrics, view.selected.sessions
-        ),
-        width="stretch",
-        config={"displaylogo": False, "scrollZoom": False},
-    )
+    for predictor in ("steps", "floors"):
+        _plot(
+            steps_floors_vs_subsequent_sleep_figure(
+                view.selected.garmin_metrics, view.selected.sessions, predictor
+            ),
+        )
     st.subheader("Time from activity to sleep")
     st.plotly_chart(
         activity_to_sleep_gap_figure(view.selected.activities, view.selected.sessions),

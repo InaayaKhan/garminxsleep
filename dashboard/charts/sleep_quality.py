@@ -11,6 +11,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from dashboard.charts.common import (
+    DURATION_COLOR,
+    HRV_COLOR,
+    SCORE_COLOR,
+    STRESS_COLOR,
     NIGHT_BAR_COLOR,
     SLEEP_SCORE_PINK,
     STATS_RED,
@@ -29,7 +33,7 @@ def menstrual_phase_comparisons_figure(
     """Compare sleep and recovery measurements across Garmin cycle phases."""
     panels = (
         ("Sleep duration", "sleep_hours", "hours"),
-        ("Garmin Sleep score", "sleep_score", "score"),
+        ("Sleep score", "sleep_score", "score"),
         ("Overnight HRV", "overnight_hrv_display", "ms"),
         ("Resting heart rate", "daily_resting_heart_rate", "bpm"),
         ("Sleep stress", "average_sleep_stress", ""),
@@ -218,19 +222,28 @@ def multifactor_relationships_figure(
         except ValueError:
             phase_number = 0
         labels[column] = phase_labels.get(phase_number, column)
+    # Same sleep metrics, order and colours as the Activity & sleep charts.
     outcomes = (
-        ("sleep_score", "Sleep score", 1, 1),
-        ("hrv", "Overnight HRV", 1, 2),
-        ("average_sleep_stress", "Average sleep stress", 2, 1),
-        ("sleep_hours", "Sleep duration", 2, 2),
+        ("sleep_hours", "Duration", DURATION_COLOR),
+        ("sleep_score", "Sleep score", SCORE_COLOR),
+        ("hrv", "HRV", HRV_COLOR),
+        ("average_sleep_stress", "Stress", STRESS_COLOR),
     )
+    # One row with a shared factor axis: every factor sits on the same line in
+    # each panel and is labelled once, on the left.
+    factor_order = [labels[column] for column in design]
     figure = make_subplots(
-        rows=2,
-        cols=2,
-        subplot_titles=[item[1] for item in outcomes],
-        vertical_spacing=0.13,
+        rows=1,
+        cols=len(outcomes),
+        shared_yaxes=True,
+        horizontal_spacing=0.025,
+        subplot_titles=[name for _, name, _ in outcomes],
     )
-    for outcome, _title, row_index, column_index in outcomes:
+    # Bold metric headers in their colours, like the Activity & sleep panels.
+    for annotation, (_, name, color) in zip(figure.layout.annotations, outcomes):
+        annotation.text = f"<b>{name}</b>"
+        annotation.font = dict(color=color, size=13)
+    for column_index, (outcome, _name, _color) in enumerate(outcomes, 1):
         outcome_predictors = [
             column
             for column in design
@@ -244,6 +257,9 @@ def multifactor_relationships_figure(
             for column in outcome_predictors
             if combined[column].nunique() > 1
         ]
+        figure.update_xaxes(
+            title_text="Coefficient", zeroline=True, row=1, col=column_index
+        )
         if len(combined) < len(usable) + 3 or not usable:
             continue
         x = combined[usable].astype(float)
@@ -251,10 +267,28 @@ def multifactor_relationships_figure(
         y = combined[outcome].astype(float)
         y = (y - y.mean()) / (y.std(ddof=0) or 1)
         coefficients = np.linalg.lstsq(np.column_stack([np.ones(len(x)), x]), y, rcond=None)[0][1:]
-        order = np.argsort(np.abs(coefficients))
-        figure.add_trace(go.Bar(x=coefficients[order], y=[labels[c] for c in np.array(usable)[order]], orientation="h", marker_color=["#4DB88A" if value >= 0 else "#E14E5C" for value in coefficients[order]], showlegend=False), row=row_index, col=column_index)
-        figure.update_xaxes(title_text="Standardized coefficient", zeroline=True, row=row_index, col=column_index)
-    figure.update_layout(title="Multifactor relationships", height=980, margin=dict(l=180, r=30, t=90, b=60))
+        figure.add_trace(
+            go.Bar(
+                x=coefficients,
+                y=[labels[column] for column in usable],
+                orientation="h",
+                marker_color=["#4DB88A" if value >= 0 else "#E14E5C" for value in coefficients],
+                hovertemplate="%{y}: %{x:+.2f}<extra></extra>",
+                showlegend=False,
+            ),
+            row=1,
+            col=column_index,
+        )
+    figure.update_yaxes(
+        categoryorder="array",
+        # Top to bottom in the order listed above.
+        categoryarray=factor_order[::-1],
+    )
+    figure.update_layout(
+        title="Multifactor relationships",
+        height=max(420, 34 * len(factor_order) + 150),
+        margin=dict(l=210, r=30, t=100, b=80),
+    )
     return figure
 
 
@@ -457,7 +491,7 @@ def sleep_efficiency_vs_score_figure(sessions: pd.DataFrame) -> go.Figure:
             customdata=frame[["sleep_date", "interruption_minutes", "aid_name"]],
             hovertemplate=(
                 "%{customdata[0]}<br>Sleep efficiency: %{x:.1f}%<br>"
-                "Garmin Sleep score: %{y:.0f}/100<br>"
+                "Sleep score: %{y:.0f}/100<br>"
                 "Awake in holes: %{customdata[1]:.0f} min<br>"
                 "Aid: %{customdata[2]}<extra></extra>"
             ),
@@ -471,11 +505,11 @@ def sleep_efficiency_vs_score_figure(sessions: pd.DataFrame) -> go.Figure:
         color=SLEEP_SCORE_PINK,
     )
     figure.update_layout(
-        title="Sleep efficiency vs Garmin Sleep score",
+        title="Sleep efficiency vs Sleep score",
         height=520,
         margin=dict(l=70, r=24, t=64, b=64),
         xaxis=dict(title="Sleep efficiency", range=[0, 100], ticksuffix="%"),
-        yaxis=dict(title="Garmin Sleep score (0–100)", range=[0, 100], dtick=10),
+        yaxis=dict(title="Sleep score (0–100)", range=[0, 100], dtick=10),
     )
     _add_spearman_annotation(figure, frame["efficiency"], frame["score_100"])
     return figure

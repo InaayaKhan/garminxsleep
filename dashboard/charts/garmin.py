@@ -20,7 +20,7 @@ def sleep_score_components_figure(metrics: pd.DataFrame) -> go.Figure:
             text="No Garmin sleep-score components in the selected date range",
             showarrow=False,
         )
-        figure.update_layout(title="Garmin Sleep score components", height=360)
+        figure.update_layout(title="Sleep score components", height=360)
         return figure
 
     frame = metrics.sort_values("date").copy()
@@ -99,7 +99,7 @@ def sleep_score_components_figure(metrics: pd.DataFrame) -> go.Figure:
         )
     )
     figure.update_layout(
-        title="Garmin Sleep score components",
+        title="Sleep score components",
         height=470,
         margin=dict(l=125, r=80, t=70, b=60),
         xaxis=dict(title="Sleep date", tickformat="%d.%m", showgrid=False),

@@ -16,6 +16,20 @@ from dashboard.data import cached_dataset, save_garmin_aid_override
 from dashboard.tabs import ViewData
 
 
+OVER_TIME_INFO = (
+    "Sleep scores are shown for night sleep only. Point colors indicate "
+    "the recorded sleep aid. Aid comparisons are descriptive, not causal."
+)
+
+
+HINDRANCES_INFO = (
+    "Hindrances come from Sleepmeter, so only Sleepmeter-recorded nights are "
+    "included; Garmin doesn't record them. A night with several hindrances "
+    "counts toward each. Comparisons are descriptive: a few nights with a "
+    "hindrance can differ by chance."
+)
+
+
 def render(view: ViewData) -> None:
     st.markdown(
         'How nights with each sleep aid or hindrance compare. These are descriptive: aids were used in different periods, so differences can also reflect the season or other changes.'
@@ -117,7 +131,7 @@ def render(view: ViewData) -> None:
             width="stretch",
             config={"displaylogo": False},
         )
-    st.subheader("Over time")
+    st.subheader("Over time", help=OVER_TIME_INFO)
     st.plotly_chart(
         aid_duration_timeline_figure(
             view.history.daily,
@@ -128,11 +142,7 @@ def render(view: ViewData) -> None:
         width="stretch",
         config={"displaylogo": False},
     )
-    st.caption(
-        "Sleep scores are shown for night sleep only. Point colors indicate "
-        "the recorded sleep aid. Aid comparisons are descriptive, not causal."
-    )
-    st.subheader("Hindrances")
+    st.subheader("Hindrances", help=HINDRANCES_INFO)
     hindrance_score_column, hindrance_duration_column = st.columns(2)
     with hindrance_score_column:
         st.plotly_chart(
@@ -146,9 +156,3 @@ def render(view: ViewData) -> None:
             width="stretch",
             config={"displaylogo": False},
         )
-    st.caption(
-        "Hindrances come from Sleepmeter, so only Sleepmeter-recorded nights are "
-        "included; Garmin doesn't record them. A night with several hindrances "
-        "counts toward each. Comparisons are descriptive: a few nights with a "
-        "hindrance can differ by chance."
-    )
